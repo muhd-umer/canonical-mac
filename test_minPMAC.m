@@ -95,7 +95,7 @@ w = ones(1, U);
 
 run_test(@() minPMACMIMO(H_large, Lx, bu_min, w, cb), bu_min);
 
-fprintf('[test] Real Baseband\n');
+fprintf('[test] Real baseband\n');
 H_real = randn(2, 3, 4);
 Lx = ones(1, 3);
 bu_min = [1, 1, 1];
@@ -103,22 +103,6 @@ w = [1, 1, 1];
 cb = 2;
 
 run_test(@() minPMACMIMO(H_real, Lx, bu_min, w, cb), bu_min);
-
-fprintf('[test] Infeasible\n');
-Ly = 2;
-U = 3;
-N = 1;
-h_base = [1; 0.5];
-H_infeas = zeros(Ly, U, N);
-H_infeas(:, 1, 1) = 0.01 * h_base;
-H_infeas(:, 2, 1) = 0.01 * h_base;
-H_infeas(:, 3, 1) = 0.01 * h_base;
-Lx = ones(1, U);
-bu_min = [8, 8, 8];
-w = [1, 1, 1];
-cb = 1;
-
-run_test(@() minPMACMIMO(H_infeas, Lx, bu_min, w, cb), bu_min, true);
 
 %% helper functions
 

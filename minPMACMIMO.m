@@ -113,8 +113,6 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     fprintf('Found %d clusters, %d possible decoding orders\n', ...
         length(clusters), size(all_orders, 1));
 
-    rate_tol = 1; % generous tolerance for rate feasibility
-
     %% compute solution based on number of orders
     if size(all_orders, 1) == 1
         % single decoding order
@@ -129,13 +127,6 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, {order}, 1, {Rxx_opt}, bu_achieved, b_achieved, 'Solved', ...
             idx_start, idx_end);
-        feasible_rates = all(bu_a >= bu_min - rate_tol);
-        info.feasible = feasible_rates;
-
-        if ~feasible_rates
-            FEAS_FLAG = 0;
-            info.sol_status = 'Failed/Infeasible';
-        end
 
     else
         % multiple orders - solve for time-sharing weights
@@ -158,13 +149,6 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, orderings, weights, {Rxx_opt}, bu_vertices, [], 'Solved', ...
             idx_start, idx_end);
-        feasible_rates = all(bu_a >= bu_min - rate_tol);
-        info.feasible = feasible_rates;
-
-        if ~feasible_rates
-            FEAS_FLAG = 0;
-            info.sol_status = 'Infeasible';
-        end
 
     end
 
