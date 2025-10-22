@@ -7,6 +7,7 @@ logs/
 **.mat
 **.pkl
 .claude/
+tex/
 CLAUDE.local.md
 .DS_Store
 
