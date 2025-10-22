@@ -1,5 +1,5 @@
 function f = eval_f_mimo(theta, H, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
-    % EVAL_F_MIMO - Evaluates the Lagrangian objective for MIMO
+    %EVAL_F_MIMO Evaluate the Lagrangian objective for MIMO MAC
 
     U = length(Lx);
     theta_diff = 0.5 * (theta - [theta(2:U); 0]);
@@ -27,7 +27,7 @@ function f = eval_f_mimo(theta, H, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
         R_u = Rxx(ant_idx, ant_idx);
 
         f = f + theta_diff(u) * log(det(RYY(:, :, u)));
-        f = f + log(det(R_u) +1e-10); % Barrier for positive definiteness
+        f = f + log(det(R_u) +1e-10); % barrier for positive definiteness
         f = f - w(u) * trace(R_u);
     end
 

@@ -1,33 +1,33 @@
 function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end)
-    %MINPTONE_MIMO  Dual maximization on a single tone for MIMO MAC
-    %   [f, b, Rxx] = MINPTONE_MIMO(H, theta, w, Lx, idx_start, idx_end)
-    %   solves the per-tone Lagrangian maximization that appears inside the
-    %   ellipsoid method for the MIMO minPMAC problem. This implementation
-    %   avoids CVX and works directly with the covariance matrices for each
-    %   user by applying a projected gradient ascent on the dual objective.
+    %MINPTONE_MIMO Dual maximization on a single tone for MIMO MAC
+    %   [f, b, Rxx] = MINPTONE_MIMO(H, theta, w, Lx, idx_start, idx_end) solves the
+    %   per-tone Lagrangian maximization that appears inside the ellipsoid method
+    %   for the MIMO minPMAC problem. This implementation avoids CVX and works
+    %   directly with the covariance matrices for each user by applying a projected
+    %   gradient ascent on the dual objective.
     %
     %   Inputs:
-    %     H           Ly-by-Ltot channel matrix for this tone (users stacked)
-    %     theta       U-by-1 dual variables (not yet sorted)
-    %     w           U-by-1 user energy weights
-    %     Lx          U-by-1 number of antennas per user
-    %     idx_start   U-by-1 starting indices for each user's antennas
-    %     idx_end     U-by-1 ending indices for each user's antennas
+    %       H           Ly-by-Ltot channel matrix for this tone (users stacked).
+    %       theta       U-by-1 dual variables (not yet sorted).
+    %       w           U-by-1 user energy weights.
+    %       Lx          U-by-1 number of antennas per user.
+    %       idx_start   U-by-1 starting indices for each user's antennas.
+    %       idx_end     U-by-1 ending indices for each user's antennas.
     %
     %   Outputs:
-    %     f     scalar value theta' * b - sum_u w_u * trace(R_u)
-    %     b     U-by-1 rate vector (in nats/channel use, consistent with SISO)
-    %     Rxx   Ltot-by-Ltot transmit covariance matrix for this tone
+    %       f     scalar value theta' * b - sum_u w_u * trace(R_u).
+    %       b     U-by-1 rate vector in nats/channel use (consistent with SISO).
+    %       Rxx   Ltot-by-Ltot transmit covariance matrix for this tone.
 
     [Ly, ~] = size(H);
     U = length(Lx);
 
-    % Sort users according to theta (descending) to match polymatroid vertex
+    % sort users according to theta (descending) to match polymatroid vertex
     [stheta, order] = sort(-theta);
     stheta = -stheta;
     sw = w(order);
 
-    % Build per-user channel blocks for the sorted order
+    % build per-user channel blocks for the sorted order
     H_blocks = cell(U, 1);
     block_sizes = Lx(order);
 
@@ -37,17 +37,17 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end)
         H_blocks{u} = H(:, cols);
     end
 
-    % Coefficients alpha_k = 0.5 * (theta_k - theta_{k+1}), theta_{U+1}=0
+    % coefficients alpha_k = 0.5 * (theta_k - theta_{k+1}), theta_{U+1}=0
     alpha = 0.5 * (stheta - [stheta(2:U); 0]);
 
-    % Initialize strictly feasible PSD covariances (small identity)
+    % initialize strictly feasible psd covariances (small identity)
     R_blocks = cell(U, 1);
 
     for u = 1:U
         R_blocks{u} = 1e-6 * eye(block_sizes(u));
     end
 
-    % Gradient-ascent parameters
+    % gradient-ascent parameters
     max_it = 500;
     tol_grad = 1e-6;
     step_init = 1.0;
@@ -83,7 +83,7 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end)
 
             [F_trial, ~] = compute_objective_and_gradient(H_blocks, trial_blocks, alpha, sw);
 
-            % Directional derivative surrogate for Armijo test
+            % directional derivative surrogate for armijo test
             dir_improve = 0;
 
             for u = 1:U
@@ -106,14 +106,14 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end)
         end
 
         if ~accepted
-            % No productive direction detected; terminate
+            % no productive direction detected; terminate
             break;
         end
 
         [~, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, alpha, sw);
     end
 
-    % Compute achieved rates (nats) for sorted users
+    % compute achieved rates (nats) for sorted users
     b_sorted = zeros(U, 1);
     S_prev = eye(Ly);
 
@@ -123,11 +123,11 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end)
         S_prev = symmetrize(S_curr);
     end
 
-    % Map rates back to original ordering
+    % map rates back to original ordering
     b = zeros(U, 1);
     b(order) = b_sorted;
 
-    % Assemble full covariance matrix in original antenna order
+    % assemble full covariance matrix in original antenna order
     Ltot = sum(Lx);
     Rxx = zeros(Ltot, Ltot);
 
@@ -137,7 +137,7 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end)
         Rxx(cols, cols) = symmetrize(R_blocks{u});
     end
 
-    % Objective value
+    % objective value
     energy = 0;
 
     for u = 1:U
@@ -149,7 +149,7 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end)
 end
 
 function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, alpha, w)
-    % Evaluate dual objective and its gradient for the current covariance set.
+    % evaluate dual objective and its gradient for the current covariance set.
     U = numel(H_blocks);
     Ly = size(H_blocks{1}, 1);
     S = eye(Ly);

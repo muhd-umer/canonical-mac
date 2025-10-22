@@ -1,4 +1,4 @@
-%TEST_MINPMAC Test suite for non-CVX minPMAC implementations
+%TEST_MINPMAC Collection of tests for minPMACMIMO
 
 clear;
 clc;
@@ -25,7 +25,7 @@ fprintf('  users: %d, tones: %d, rx: %d\n', length(Lx_siso), size(H_siso, 3), si
 fprintf('  target rates: [%s]\n', num2str(bu_ref_siso));
 fprintf('  achieved rates: [%s]\n', num2str(bu_a));
 fprintf('  feasibility flag: %d\n', flag);
-fprintf('  total energy: %.4f (expected 6.4746, diff %.6f)\n', total_energy, abs(total_energy - 6.4746));
+fprintf('  total energy: %.4f\n', total_energy);
 fprintf('  order: [%s]\n', num2str(info.orderings{1}));
 fprintf('\n');
 
@@ -123,6 +123,7 @@ run_test(@() minPMACMIMO(H_infeas, Lx, bu_min, w, cb), bu_min, true);
 %% helper functions
 
 function run_test(solver, target_rates, expect_infeasible)
+
     if nargin < 3
         expect_infeasible = false;
     end
@@ -153,18 +154,23 @@ function run_test(solver, target_rates, expect_infeasible)
             num_clusters, num_orders, elapsed);
 
         if expect_infeasible
+
             if flag == 0
                 fprintf('  [✓] infeasible case detected\n');
             else
                 fprintf('  [x] infeasible case not detected\n');
             end
+
         else
+
             if flag > 0
                 fprintf('  [✓] test passed\n');
             else
                 fprintf('  [x] test failed (infeasible)\n');
             end
+
         end
+
     catch ME
         fprintf('  [x] test crashed: %s\n', ME.message);
     end

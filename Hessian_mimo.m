@@ -1,11 +1,11 @@
 function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
-    % HESSIAN_MIMO - Computes gradient and Hessian for MIMO case
+    %HESSIAN_MIMO Compute gradient and Hessian contributions for MIMO users
 
     U = length(Lx);
     Ltot = sum(Lx);
     theta_diff = 0.5 * (theta - [theta(2:U); 0]);
 
-    % Compute RYY inverses recursively using matrix inversion lemma
+    % compute RYY inverses recursively using matrix inversion lemma
     RYY_inv = zeros(Ly, Ly, U);
     RYY_inv(:, :, 1) = eye(Ly);
 
@@ -25,7 +25,7 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
 
     end
 
-    % Compute gradient (vectorized)
+    % compute gradient (vectorized)
     g = zeros(Ltot ^ 2, 1);
 
     for u = 1:U
@@ -35,12 +35,12 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
 
         grad_u = zeros(Lx(ind(u)), Lx(ind(u)));
 
-        % Sum over j >= u
+        % sum over j >= u
         for j = u:U
             grad_u = grad_u + theta_diff(j) * (H_u' * RYY_inv(:, :, j) * H_u);
         end
 
-        % Barrier gradient
+        % barrier gradient
         try
             R_inv = inv(R_u + eye(Lx(ind(u))) * 1e-8);
             grad_u = grad_u + R_inv;
@@ -51,7 +51,7 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
 
         grad_u = grad_u - w(u) * eye(Lx(ind(u)));
 
-        % Place in vectorized gradient
+        % place in vectorized gradient
         row_start = (ant_idx(1) - 1) * Ltot + ant_idx(1);
         row_end = ant_idx(end) * Ltot;
         g_indices = [];
@@ -68,7 +68,7 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
         g(g_indices) = grad_u(:);
     end
 
-    % Compute Hessian (approximate with diagonal blocks for efficiency)
+    % compute hessian (approximate with diagonal blocks for efficiency)
     H = zeros(Ltot ^ 2, Ltot ^ 2);
 
     for u = 1:U
@@ -79,14 +79,14 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
 
         hess_u = zeros(L_u * L_u, L_u * L_u);
 
-        % Diagonal approximation for computational efficiency
+        % diagonal approximation for computational efficiency
         for j = u:U
             M = RYY_inv(:, :, j);
             term = -theta_diff(j) * kron((H_u' * M * H_u)', (H_u' * M * H_u));
             hess_u = hess_u + term;
         end
 
-        % Barrier Hessian
+        % barrier hessian
         try
             R_inv = inv(R_u + eye(L_u) * 1e-8);
             barrier_hess = -kron(R_inv', R_inv);
@@ -97,7 +97,7 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
             hess_u = hess_u + barrier_hess;
         end
 
-        % Place in block-diagonal Hessian
+        % place in block-diagonal hessian
         h_indices = [];
 
         for i = 1:length(ant_idx)
@@ -112,7 +112,7 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
         H(h_indices, h_indices) = hess_u;
     end
 
-    % Ensure Hessian is symmetric and well-conditioned
+    % ensure hessian is symmetric and well-conditioned
     H = (H + H') / 2;
     H = H + eye(size(H)) * max(abs(diag(H))) * 1e-6;
 end

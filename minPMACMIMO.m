@@ -1,26 +1,26 @@
 function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
-    % MINPMACMIMO - Minimum power multi-user MIMO MAC (non-CVX implementation)
-    %
-    % SYNTAX:
-    %   [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
-    %
-    % INPUTS:
-    %   H       - Channel matrix [Ly, sum(Lx), N] concatenated across users
-    %   Lx      - Antennas per user [1, U] where sum(Lx) = total TX antennas
-    %   bu_min  - Target rates per user [1, U] (bits per channel use)
-    %   w       - Energy weights [1, U] (positive weights for energy objective)
-    %   cb      - Baseband type: 1=complex, 2=real (affects rate calculation)
-    %
-    % OUTPUTS:
-    %   FEAS_FLAG - Feasibility: 0=infeasible, 1=single order, 2=time-sharing
-    %   bu_a      - Achieved rates [1, U] (bits per channel use)
-    %   info      - Structure with detailed results
+%MINPMACMIMO Minimum power multi-user MIMO MAC (non-CVX implementation)
+%   [FEAS_FLAG, bu_a, info] = MINPMACMIMO(H, Lx, bu_min, w, cb) computes the
+%   optimal covariance matrices that satisfy user rate targets with minimum
+%   weighted energy for both SISO and MIMO MAC configurations.
+%
+%   Inputs:
+%       H       channel matrix [Ly, sum(Lx), N] concatenated across users.
+%       Lx      antennas per user [1, U] where sum(Lx) equals total TX antennas.
+%       bu_min  target rates per user [1, U] in bits per channel use.
+%       w       positive energy weights [1, U].
+%       cb      baseband type: 1 for complex, 2 for real (affects rate scaling).
+%
+%   Outputs:
+%       FEAS_FLAG   feasibility flag: 0 infeasible, 1 single order, 2 time-sharing.
+%       bu_a        achieved user rates in bits per channel use.
+%       info        structure with detailed solution metrics.
 
     tic;
     [Ly, Ltot, N] = size(H);
     U = length(Lx);
 
-    % Validate inputs
+    % validate inputs
     if sum(Lx) ~= Ltot
         error('sum(Lx) = %d must equal total TX antennas = %d', sum(Lx), Ltot);
     end
@@ -41,106 +41,82 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         error('Each user must have at least 1 antenna');
     end
 
-    % Compute antenna index mapping
+    % compute antenna index mapping
     idx_end = cumsum(Lx);
     idx_start = [1, idx_end(1:end - 1) + 1];
 
-    % Convert to column vectors
-    bu_min = double(bu_min(:));
+    % convert to column vectors
+    bu_min_bits = double(bu_min(:));
     w = double(w(:));
     H = double(H);
 
-    bu_min = 1 / (3 - cb) * bu_min;
+    % internal scaling (match siso reference: handle cb factor first)
+    bu_internal = (1 / (3 - cb)) * bu_min_bits;
 
-    % Scale rates for optimization
-    bu_scaled = bu_min * log(2);
+    % scale rates for optimization (nats)
+    bu_scaled = bu_internal * log(2);
 
     fprintf('minPMACMIMO: Solving for %d users, %d tones, %d RX antennas\n', U, N, Ly);
     fprintf('Antenna configuration: [%s], total=%d\n', num2str(Lx), Ltot);
 
-    % For SISO case, use reference minPMAC implementation
-    if all(Lx == 1)
-        addpath(fullfile(fileparts(mfilename('fullpath')), 'src'));
-        % minPMAC expects original (unscaled) rate in bits
-        % We've already scaled bu_min by 1/(3-cb), so reverse it
-        bu_min_orig = (3 - cb) * bu_min;
-        [Eun, theta, bun, ~, ~, ~] = minPMAC(H, bu_min_orig, w, cb);
+    %% ellipsoid method to find optimal theta (covers siso and mimo)
+    err = 1e-9;
+    count = 0;
 
-        % Convert to Rxx format (diagonal matrices for SISO)
-        Rxx_opt = zeros(Ltot, Ltot, N);
-        for n = 1:N
-            for u = 1:U
-                Rxx_opt(u, u, n) = Eun(u, n);
-            end
+    % initialize ellipsoid
+    [A, theta] = startEllipse_mimo(H, bu_internal, w, cb, Lx, idx_start, idx_end);
+
+    while true
+        % solve dual problem for current theta
+        [~, bun_internal, Rxx_opt] = Lag_dual_f_mimo(H, theta, w, bu_scaled, Lx, idx_start, idx_end);
+
+        % compute subgradient
+        g = sum(bun_internal, 2) - bu_scaled;
+
+        % check stopping criteria
+        if sqrt(g' * A * g) <= err
+            break;
         end
 
-        % minPMAC handles all scaling, so restore bu_min for later use
-        bu_min = bu_min_orig;
-    else
-        %% Ellipsoid method to find optimal theta for true MIMO case
-        err = 1e-9;
-        count = 0;
+        % update ellipsoid
+        tmp = A * g / sqrt(g' * A * g);
+        theta = theta - 1 / (U + 1) * tmp;
+        A = U ^ 2 / (U ^ 2 - 1) * (A - 2 / (U + 1) * (tmp * tmp'));
 
-        % Initialize ellipsoid
-        [A, g, w] = startEllipse_mimo(H, bu_scaled, w, cb, Lx, idx_start, idx_end);
-        theta = g;
+        % ensure theta is feasible (non-negative)
+        ind = find(theta < 0);
 
-        while true
-            % Solve dual problem for current theta
-            [~, bun, Rxx_opt] = Lag_dual_f_mimo(H, theta, w, bu_scaled, Lx, idx_start, idx_end);
-
-            % Compute subgradient
-            g = sum(bun, 2) - bu_scaled;
-
-            % Check stopping criteria
-            if sqrt(g' * A * g) <= err
-                break;
-            end
-
-            % Update ellipsoid
+        while ~isempty(ind)
+            g = zeros(U, 1);
+            g(ind(1)) = -1;
             tmp = A * g / sqrt(g' * A * g);
             theta = theta - 1 / (U + 1) * tmp;
             A = U ^ 2 / (U ^ 2 - 1) * (A - 2 / (U + 1) * (tmp * tmp'));
-
-            % Ensure theta is feasible (non-negative)
             ind = find(theta < 0);
-
-            while ~isempty(ind)
-                g = zeros(U, 1);
-                g(ind(1)) = -1;
-                tmp = A * g / sqrt(g' * A * g);
-                theta = theta - 1 / (U + 1) * tmp;
-                A = U ^ 2 / (U ^ 2 - 1) * (A - 2 / (U + 1) * (tmp * tmp'));
-                ind = find(theta < 0);
-            end
-
-            count = count + 1;
-
-            if count > 1000
-                warning('Ellipsoid method did not converge');
-                break;
-            end
         end
 
-        % Convert rates back from nats to bits
-        bun = (3 - cb) * bun / log(2);
-        bu_min = (3 - cb) * bu_min;
+        count = count + 1;
+
+        if count > 1000
+            warning('Ellipsoid method did not converge');
+            break;
+        end
     end
 
-    bu_scaled = (3 - cb) * bu_scaled / log(2);
+    bu_min = bu_min_bits;
 
-    %% Cluster users by Lagrange multipliers
+    %% cluster users by lagrange multipliers
     [clusters, theta_unique] = cluster_theta_values(theta);
 
-    %% Generate all possible decoding orders
+    %% generate all possible decoding orders
     all_orders = generate_decoding_orders(clusters);
 
     fprintf('Found %d clusters, %d possible decoding orders\n', ...
         length(clusters), size(all_orders, 1));
 
-    %% Compute solution based on number of orders
+    %% compute solution based on number of orders
     if size(all_orders, 1) == 1
-        % Single decoding order
+        % single decoding order
         order = all_orders(1, :);
         [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx_opt, order, ...
             Ly, U, N, cb, Lx, idx_start, idx_end);
@@ -148,12 +124,12 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         FEAS_FLAG = 1;
         bu_a = bu_achieved';
 
-        % Store single-order results
+        % store single-order results
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, {order}, 1, {Rxx_opt}, bu_achieved, b_achieved, 'Solved', ...
             idx_start, idx_end);
     else
-        % Multiple orders - solve for time-sharing weights
+        % multiple orders - solve for time-sharing weights
         [weights, bu_vertices, orderings] = solve_time_sharing_mimo(H, Rxx_opt, ...
             all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end);
 
@@ -165,17 +141,17 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
             return;
         end
 
-        % Compute weighted average of achieved rates
+        % compute weighted average of achieved rates
         bu_a = (bu_vertices * weights)';
         FEAS_FLAG = 2;
 
-        % Store time-sharing results
+        % store time-sharing results
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, orderings, weights, {Rxx_opt}, bu_vertices, [], 'Solved', ...
             idx_start, idx_end);
     end
 
-    % Compute average energies
+    % compute average energies
     info.Eu_avg = compute_average_energies_mimo(Rxx_opt, U, N, Lx, idx_start, idx_end);
     info.elapsed_time = toc;
 

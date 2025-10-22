@@ -1,20 +1,23 @@
 function [bn, en] = fmwaterfill_gn(gn, b_bar, gap, cb)
-    % FMWATERFILL_GN - Water-filling allocation for frequency-selective channel
+    %FMWATERFILL_GN Water-filling allocation for a frequency-selective channel
+    %   [bn, en] = FMWATERFILL_GN(gn, b_bar, gap, cb) distributes rate and energy
+    %   across subchannels using the classic water-filling solution while honoring
+    %   a gap parameter and complex/real baseband scaling.
     %
-    % INPUT
-    % gn is the channel gain (a row vector).
-    % b_bar is the target bit rate (b_total / Ntot)
-    % gap is the gap in dB
-    % cb=1 for complex bb and 2 for real bb
+    %   Inputs:
+    %       gn      row vector of channel gains.
+    %       b_bar   target bit rate per tone (b_total / Ntot).
+    %       gap     gap in dB.
+    %       cb      equals 1 for complex baseband and 2 for real baseband.
     %
-    % OUTPUT
-    % en is the energy in the nth subchannel
-    % bn is the bit in the nth subchannel
+    %   Outputs:
+    %       en      energy allocation per subchannel.
+    %       bn      bit allocation per subchannel.
 
-    % dB into normal scale
+    % convert dB gap to linear scale
     gap = 10 ^ (gap / 10);
 
-    % Ntot
+    % capture number of tones
     [rows, Ntot] = size(gn);
 
     if rows ~= 1
@@ -26,34 +29,35 @@ function [bn, en] = fmwaterfill_gn(gn, b_bar, gap, cb)
     bn = zeros(1, Ntot);
 
     %%%%%%%%%%%%%%%%%%%%%%%
-    % Now do waterfilling %
+    % now do water-filling %
     %%%%%%%%%%%%%%%%%%%%%%%
 
-    % sort
-    [gn_sorted, Index] = sort(gn); % sort gain, and get Index
+    % sort gains and keep indices
+    [gn_sorted, Index] = sort(gn); % sort gain and get index
 
-    gn_sorted = fliplr(gn_sorted); % flip left/right to get the largest gain in leftside
+    gn_sorted = fliplr(gn_sorted); % flip left/right to get the largest gain leftmost
     Index = fliplr(Index); % also flip index
 
     num_zero_gn = length(find(gn_sorted == 0));
-    Nstar = Ntot - num_zero_gn; % number of zero gain subchannels
+    Nstar = Ntot - num_zero_gn; % number of zero-gain subchannels
 
-    % Number of used channels, start from Ntot - (number of zero gain subchannels)
+    % number of used channels, start from Ntot minus zero-gain subchannels
     while (1)
-        % The K calculation has been modified in order to accomodate the size of the number
+        % the K calculation has been modified in order to accommodate scaling
         logK = log(gap) + 1 / Nstar * ((Ntot) * b_bar * 2 * log(2) - sum(log(gn_sorted(1:Nstar))));
         K = exp(logK);
         En_min = K - gap / gn_sorted(Nstar);
-        % En_min occurs in the worst channel
+        % en_min occurs in the worst channel
         if (En_min < 0)
-            Nstar = Nstar - 1; % If negative En, continue with less channels
+            Nstar = Nstar - 1; % if negative En, continue with fewer channels
         else
-            break; % If all En positive, done.
+            break; % if all En positive, done
         end
+
     end
 
-    En = K - gap ./ gn_sorted(1:Nstar); % Calculate En
-    Bn = (1 / cb) * log2(K * gn_sorted(1:Nstar) / gap); % Calculate bn
+    En = K - gap ./ gn_sorted(1:Nstar); % calculate En
+    Bn = (1 / cb) * log2(K * gn_sorted(1:Nstar) / gap); % calculate bn
 
     bn(Index(1:Nstar)) = Bn; % return values in original index
     en(Index(1:Nstar)) = En; % return values in original index

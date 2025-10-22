@@ -1,9 +1,8 @@
 function check_dependencies()
-    % CHECK_DEPENDENCIES Checks for required dependencies for the minPMAC demo
-    %
-    % This function checks for the presence of QuaDRiGa, minPMAC functions,
-    % and CVX in the MATLAB path. It provides feedback on missing dependencies
-    % and suggests installation steps if necessary.
+    %CHECK_DEPENDENCIES Check for required dependencies for the minPMAC demo
+    %   CHECK_DEPENDENCIES() verifies the presence of QuaDRiGa, reference
+    %   minPMAC functions, and CVX on the MATLAB path, reporting any missing
+    %   components along with installation guidance.
 
     fprintf('Checking dependencies...\n');
 
