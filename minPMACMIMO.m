@@ -1,20 +1,20 @@
 function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
-%MINPMACMIMO Minimum power multi-user MIMO MAC (non-CVX implementation)
-%   [FEAS_FLAG, bu_a, info] = MINPMACMIMO(H, Lx, bu_min, w, cb) computes the
-%   optimal covariance matrices that satisfy user rate targets with minimum
-%   weighted energy for both SISO and MIMO MAC configurations.
-%
-%   Inputs:
-%       H       channel matrix [Ly, sum(Lx), N] concatenated across users.
-%       Lx      antennas per user [1, U] where sum(Lx) equals total TX antennas.
-%       bu_min  target rates per user [1, U] in bits per channel use.
-%       w       positive energy weights [1, U].
-%       cb      baseband type: 1 for complex, 2 for real (affects rate scaling).
-%
-%   Outputs:
-%       FEAS_FLAG   feasibility flag: 0 infeasible, 1 single order, 2 time-sharing.
-%       bu_a        achieved user rates in bits per channel use.
-%       info        structure with detailed solution metrics.
+    %MINPMACMIMO Minimum power multi-user MIMO MAC (non-CVX implementation)
+    %   [FEAS_FLAG, bu_a, info] = MINPMACMIMO(H, Lx, bu_min, w, cb) computes the
+    %   optimal covariance matrices that satisfy user rate targets with minimum
+    %   weighted energy for both SISO and MIMO MAC configurations.
+    %
+    %   Inputs:
+    %       H       channel matrix [Ly, sum(Lx), N] concatenated across users.
+    %       Lx      antennas per user [1, U] where sum(Lx) equals total TX antennas.
+    %       bu_min  target rates per user [1, U] in bits per channel use.
+    %       w       positive energy weights [1, U].
+    %       cb      baseband type: 1 for complex, 2 for real (affects rate scaling).
+    %
+    %   Outputs:
+    %       FEAS_FLAG   feasibility flag: 0 infeasible, 1 single order, 2 time-sharing.
+    %       bu_a        achieved user rates in bits per channel use.
+    %       info        structure with detailed solution metrics.
 
     tic;
     [Ly, Ltot, N] = size(H);
@@ -49,8 +49,6 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     bu_min_bits = double(bu_min(:));
     w = double(w(:));
     H = double(H);
-
-    % internal scaling (match siso reference: handle cb factor first)
     bu_internal = (1 / (3 - cb)) * bu_min_bits;
 
     % scale rates for optimization (nats)
@@ -59,7 +57,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     fprintf('minPMACMIMO: Solving for %d users, %d tones, %d RX antennas\n', U, N, Ly);
     fprintf('Antenna configuration: [%s], total=%d\n', num2str(Lx), Ltot);
 
-    %% ellipsoid method to find optimal theta (covers siso and mimo)
+    %% ellipsoid method to find optimal theta
     err = 1e-9;
     count = 0;
 
@@ -101,6 +99,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
             warning('Ellipsoid method did not converge');
             break;
         end
+
     end
 
     bu_min = bu_min_bits;
@@ -113,6 +112,8 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
 
     fprintf('Found %d clusters, %d possible decoding orders\n', ...
         length(clusters), size(all_orders, 1));
+
+    rate_tol = 1; % generous tolerance for rate feasibility
 
     %% compute solution based on number of orders
     if size(all_orders, 1) == 1
@@ -128,6 +129,14 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, {order}, 1, {Rxx_opt}, bu_achieved, b_achieved, 'Solved', ...
             idx_start, idx_end);
+        feasible_rates = all(bu_a >= bu_min - rate_tol);
+        info.feasible = feasible_rates;
+
+        if ~feasible_rates
+            FEAS_FLAG = 0;
+            info.sol_status = 'Failed/Infeasible';
+        end
+
     else
         % multiple orders - solve for time-sharing weights
         [weights, bu_vertices, orderings] = solve_time_sharing_mimo(H, Rxx_opt, ...
@@ -149,6 +158,14 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, orderings, weights, {Rxx_opt}, bu_vertices, [], 'Solved', ...
             idx_start, idx_end);
+        feasible_rates = all(bu_a >= bu_min - rate_tol);
+        info.feasible = feasible_rates;
+
+        if ~feasible_rates
+            FEAS_FLAG = 0;
+            info.sol_status = 'Infeasible';
+        end
+
     end
 
     % compute average energies
