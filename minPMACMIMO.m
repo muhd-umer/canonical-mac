@@ -14,7 +14,9 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     %   Outputs:
     %       FEAS_FLAG   feasibility flag: 0 infeasible, 1 single order, 2 time-sharing.
     %       bu_a        achieved user rates in bits per channel use.
-    %       info        structure with detailed solution metrics.
+    %       info        structure with detailed solution metrics including:
+    %                   frac   time-sharing fractions for active decoding orders (empty if single order).
+    %                   bun    per-tone bit allocations for the returned solution.
 
     tic;
     [Ly, Ltot, N] = size(H);
@@ -127,11 +129,13 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, {order}, 1, {Rxx_opt}, bu_achieved, b_achieved, 'Solved', ...
             idx_start, idx_end);
+        info.frac = [];
+        info.bun = b_achieved;
 
     else
         % multiple orders - solve for time-sharing weights
-        [weights, bu_vertices, orderings] = solve_time_sharing_mimo(H, Rxx_opt, ...
-            all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end);
+        [weights, bu_vertices, bun_orders, orderings] = solve_time_sharing_mimo(H, ...
+            Rxx_opt, all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end);
 
         if isempty(weights)
             FEAS_FLAG = 0;
@@ -142,13 +146,23 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         end
 
         % compute weighted average of achieved rates
+        weights = weights(:);
         bu_a = (bu_vertices * weights)';
+        bun_avg = zeros(U, N);
+
+        for k = 1:length(weights)
+            % aggregate per-tone bit allocations with time-sharing weights
+            bun_avg = bun_avg + bun_orders{k} * weights(k);
+        end
+
         FEAS_FLAG = 2;
 
         % store time-sharing results
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
-            clusters, orderings, weights, {Rxx_opt}, bu_vertices, [], 'Solved', ...
+            clusters, orderings, weights, {Rxx_opt}, bu_vertices, bun_orders, 'Solved', ...
             idx_start, idx_end);
+        info.frac = weights;
+        info.bun = bun_avg;
 
     end
 
@@ -242,17 +256,19 @@ function [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx, order, 
     bu_achieved = sum(b_achieved, 2);
 end
 
-function [weights, bu_vertices, orderings] = solve_time_sharing_mimo(H, Rxx, orders, ...
-        bu_min, Ly, U, N, cb, Lx, idx_start, idx_end)
+function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing_mimo(H, ...
+        Rxx, orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end)
     num_orders = size(orders, 1);
     bu_vertices = zeros(U, num_orders);
     orderings = cell(num_orders, 1);
+    bun_vertices = cell(num_orders, 1);
 
     for k = 1:num_orders
         orderings{k} = orders(k, :);
-        [bu_achieved, ~] = compute_achieved_rates_mimo(H, Rxx, orders(k, :), ...
+        [bu_achieved, bun_matrix] = compute_achieved_rates_mimo(H, Rxx, orders(k, :), ...
             Ly, U, N, cb, Lx, idx_start, idx_end);
         bu_vertices(:, k) = bu_achieved;
+        bun_vertices{k} = bun_matrix;
     end
 
     tol = 1e-3;
@@ -276,6 +292,7 @@ function [weights, bu_vertices, orderings] = solve_time_sharing_mimo(H, Rxx, ord
     weights = weights(active_idx);
     weights = weights / sum(weights);
     bu_vertices = bu_vertices(:, active_idx);
+    bun_vertices = bun_vertices(active_idx);
     orderings = orderings(active_idx);
 end
 
