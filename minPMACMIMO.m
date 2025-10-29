@@ -133,7 +133,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         info.bun = b_achieved;
 
     else
-        % multiple orders - solve for time-sharing weights
+        % multiple orders; solve for time-sharing weights
         [weights, bu_vertices, bun_orders, orderings] = solve_time_sharing_mimo(H, ...
             Rxx_opt, all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end);
 
