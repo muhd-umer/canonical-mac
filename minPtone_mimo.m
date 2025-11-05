@@ -1,4 +1,4 @@
-function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end, R_init)
+function [f, b, Rxx, state_out] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end, R_init, state_in)
     %MINPTONE_MIMO Dual maximization on a single tone for MIMO MAC
     %   [f, b, Rxx] = MINPTONE_MIMO(H, theta, w, Lx, idx_start, idx_end) solves the
     %   per-tone Lagrangian maximization that appears inside the ellipsoid method
@@ -14,11 +14,13 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end, R_init
     %       idx_start   U-by-1 starting indices for each user's antennas.
     %       idx_end     U-by-1 ending indices for each user's antennas.
     %       R_init      (optional) Ltot-by-Ltot warm-start covariance matrix.
+    %       state_in    (optional) structure with lbfgs history for warm-start.
     %
     %   Outputs:
-    %       f     scalar value theta' * b - sum_u w_u * trace(R_u).
-    %       b     U-by-1 rate vector in nats/channel use (consistent with SISO).
-    %       Rxx   Ltot-by-Ltot transmit covariance matrix for this tone.
+    %       f         scalar value theta' * b - sum_u w_u * trace(R_u).
+    %       b         U-by-1 rate vector in nats/channel use (consistent with SISO).
+    %       Rxx       Ltot-by-Ltot transmit covariance matrix for this tone.
+    %       state_out optional structure retaining lbfgs warm-start data.
 
     [Ly, ~] = size(H);
     U = length(Lx);
@@ -41,20 +43,47 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end, R_init
     % coefficients alpha_k = 0.5 * (theta_k - theta_{k+1}), theta_{U+1}=0
     alpha = 0.5 * (stheta - [stheta(2:U); 0]);
 
-    if nargin < 7 || isempty(R_init)
-        R_init_blocks = [];
-    else
-        R_init_blocks = cell(U, 1);
-
-        for u = 1:U
-            orig = order(u);
-            cols = idx_start(orig):idx_end(orig);
-            R_init_blocks{u} = symmetrize(R_init(cols, cols));
-        end
-
+    if nargin < 8
+        state_in = [];
     end
 
-    [R_blocks, ~] = maximize_dual_lbfgs(H_blocks, alpha, sw, block_sizes, R_init_blocks);
+    state_out = [];
+    state_valid = true;
+
+    if ~isempty(state_in)
+
+        if ~isfield(state_in, 'order') || ~isequal(state_in.order(:), order(:))
+            state_in = [];
+            state_valid = false;
+        elseif ~isfield(state_in, 'block_sizes') || any(state_in.block_sizes(:) ~= block_sizes(:))
+            state_in = [];
+            state_valid = false;
+        end
+
+    else
+        state_valid = false;
+    end
+
+    if ~state_valid
+
+        if nargin < 7 || isempty(R_init)
+            R_init_blocks = [];
+        else
+            R_init_blocks = cell(U, 1);
+
+            for u = 1:U
+                orig = order(u);
+                cols = idx_start(orig):idx_end(orig);
+                R_init_blocks{u} = symmetrize(R_init(cols, cols));
+            end
+
+        end
+
+    else
+        R_init_blocks = [];
+    end
+
+    [R_blocks, ~, state_internal] = maximize_dual_lbfgs(H_blocks, alpha, sw, block_sizes, R_init_blocks, state_in);
 
     % compute achieved rates (nats) for sorted users
     b_sorted = zeros(U, 1);
@@ -89,6 +118,11 @@ function [f, b, Rxx] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end, R_init
     end
 
     f = real(theta' * b - energy);
+
+    if nargout >= 4
+        state_out = finalize_state(state_internal, order, block_sizes, R_blocks);
+    end
+
 end
 
 function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, alpha, w)
@@ -143,7 +177,7 @@ function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, a
 
 end
 
-function [R_blocks, F_opt] = maximize_dual_lbfgs(H_blocks, alpha, w, block_sizes, R_init_blocks)
+function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, block_sizes, R_init_blocks, state_in)
     % lbfgs parameters tuned for fast convergence on smooth dual
     max_it = 200;
     tol_grad = 1e-6;
@@ -154,24 +188,43 @@ function [R_blocks, F_opt] = maximize_dual_lbfgs(H_blocks, alpha, w, block_sizes
     armijo_c = 1e-4;
     max_linesearch = 15;
     U = numel(H_blocks);
-    B_blocks = cell(U, 1);
 
-    for u = 1:U
+    if nargin < 6
+        state_in = [];
+    end
 
-        if nargin >= 5 && ~isempty(R_init_blocks)
-            Ru = symmetrize(R_init_blocks{u});
-            B_blocks{u} = initialize_factor(Ru);
-        else
-            B_blocks{u} = sqrt(1e-6) * eye(block_sizes(u));
+    [state_valid, prepared_state] = prepare_lbfgs_state(state_in, block_sizes, U);
+
+    if state_valid
+        B_blocks = prepared_state.B_blocks;
+        S_hist = prepared_state.S_hist;
+        Y_hist = prepared_state.Y_hist;
+    else
+        B_blocks = cell(U, 1);
+
+        for u = 1:U
+
+            if ~isempty(R_init_blocks)
+                Ru = symmetrize(R_init_blocks{u});
+                B_blocks{u} = initialize_factor(Ru);
+            else
+                B_blocks{u} = sqrt(1e-6) * eye(block_sizes(u));
+            end
+
         end
 
+        S_hist = cell(0, 1);
+        Y_hist = cell(0, 1);
     end
 
     x = pack_complex_blocks(B_blocks, block_sizes);
+
+    if state_valid
+        [S_hist, Y_hist] = sanitize_history(S_hist, Y_hist, numel(x), m_hist);
+    end
+
     [phi, F_opt, grad, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes);
     grad_norm = norm(grad);
-    S_hist = cell(0, 1);
-    Y_hist = cell(0, 1);
 
     for iter = 1:max_it
 
@@ -282,6 +335,14 @@ function [R_blocks, F_opt] = maximize_dual_lbfgs(H_blocks, alpha, w, block_sizes
         grad_norm = norm(grad);
     end
 
+    state_out = struct();
+    state_out.B_blocks = B_blocks;
+    state_out.S_hist = S_hist;
+    state_out.Y_hist = Y_hist;
+    state_out.x = x;
+    state_out.grad = grad;
+    state_out.phi = phi;
+    state_out.F = F_opt;
 end
 
 function [phi, F_val, grad_vec, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes)
@@ -400,6 +461,94 @@ end
 
 function val = dot_real(a, b)
     val = real(sum(a .* b));
+end
+
+function [is_valid, state_out] = prepare_lbfgs_state(state_in, block_sizes, U)
+    is_valid = false;
+    state_out = struct();
+
+    if isempty(state_in) || ~isstruct(state_in)
+        return;
+    end
+
+    if ~isfield(state_in, 'B_blocks')
+        return;
+    end
+
+    if isfield(state_in, 'block_sizes')
+
+        if numel(state_in.block_sizes) ~= numel(block_sizes)
+            return;
+        end
+
+        if any(state_in.block_sizes(:) ~= block_sizes(:))
+            return;
+        end
+
+    end
+
+    if numel(state_in.B_blocks) ~= U
+        return;
+    end
+
+    for u = 1:U
+        Bu = state_in.B_blocks{u};
+
+        if isempty(Bu) || any(size(Bu) ~= block_sizes(u))
+            return;
+        end
+
+    end
+
+    state_out = state_in;
+
+    if ~isfield(state_out, 'S_hist') || ~iscell(state_out.S_hist)
+        state_out.S_hist = cell(0, 1);
+    end
+
+    if ~isfield(state_out, 'Y_hist') || ~iscell(state_out.Y_hist)
+        state_out.Y_hist = cell(0, 1);
+    end
+
+    is_valid = true;
+end
+
+function [S_hist_out, Y_hist_out] = sanitize_history(S_hist_in, Y_hist_in, dim, m_hist)
+
+    if isempty(S_hist_in) || isempty(Y_hist_in)
+        S_hist_out = cell(0, 1);
+        Y_hist_out = cell(0, 1);
+        return;
+    end
+
+    k = min([numel(S_hist_in), numel(Y_hist_in), m_hist]);
+    start_idx = max(1, numel(S_hist_in) - k + 1);
+    S_hist_out = cell(0, 1);
+    Y_hist_out = cell(0, 1);
+
+    for idx = start_idx:numel(S_hist_in)
+        s = S_hist_in{idx};
+        y = Y_hist_in{idx};
+
+        if numel(s) == dim && numel(y) == dim
+            S_hist_out{end + 1, 1} = s;
+            Y_hist_out{end + 1, 1} = y;
+        end
+
+    end
+
+end
+
+function state_out = finalize_state(state_internal, order, block_sizes, R_blocks)
+
+    if nargin < 1 || isempty(state_internal) || ~isstruct(state_internal)
+        state_internal = struct();
+    end
+
+    state_out = state_internal;
+    state_out.order = order;
+    state_out.block_sizes = block_sizes;
+    state_out.R_blocks = R_blocks;
 end
 
 function B = initialize_factor(R)

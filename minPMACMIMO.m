@@ -66,10 +66,11 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     % initialize ellipsoid
     [A, theta] = startEllipse_mimo(H, bu_internal, w, cb, Lx, idx_start, idx_end);
     Rxx_warm = [];
+    state_warm = cell(N, 1);
 
     while true
         % solve dual problem for current theta
-        [~, bun_internal, Rxx_opt] = Lag_dual_f_mimo(H, theta, w, bu_scaled, Lx, idx_start, idx_end, Rxx_warm);
+        [~, bun_internal, Rxx_opt, state_warm] = Lag_dual_f_mimo(H, theta, w, bu_scaled, Lx, idx_start, idx_end, Rxx_warm, state_warm);
         Rxx_warm = Rxx_opt;
 
         % compute subgradient
@@ -222,40 +223,60 @@ end
 function [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx, order, ...
         Ly, U, N, cb, Lx, idx_start, idx_end)
     b_achieved = zeros(U, N);
+    cols_per_order = cell(U, 1);
+
+    for k = 1:U
+        user_idx = order(k);
+        cols_per_order{k} = idx_start(user_idx):idx_end(user_idx);
+    end
+
+    eye_Ly = eye(Ly);
+    inv_log2 = 1 / log(2);
+    suffix_cache = cell(U, 1);
 
     for n = 1:N
         Rn = Rxx(:, :, n);
 
         for k = 1:U
-            u = order(k);
-            signal_plus_intf = zeros(Ly, Ly);
+            cols = cols_per_order{k};
+            Hv = H(:, cols, n);
+            Rv = Rn(cols, cols);
+            suffix_cache{k} = symmetrize_local(Hv * (Rv * Hv'));
+        end
 
-            for j = k:U
-                v = order(j);
-                ant_idx = idx_start(v):idx_end(v);
-                H_v = H(:, ant_idx, n);
-                R_v = Rn(ant_idx, ant_idx);
-                signal_plus_intf = signal_plus_intf + H_v * R_v * H_v';
-            end
+        suffix_sum = zeros(Ly, Ly);
+        suffix_next_logdet = 0;
 
-            interference = zeros(Ly, Ly);
-
-            for j = (k + 1):U
-                v = order(j);
-                ant_idx = idx_start(v):idx_end(v);
-                H_v = H(:, ant_idx, n);
-                R_v = Rn(ant_idx, ant_idx);
-                interference = interference + H_v * R_v * H_v';
-            end
-
-            rate_with_signal = log2(det(eye(Ly) + signal_plus_intf));
-            rate_interference_only = log2(det(eye(Ly) + interference));
-            b_achieved(u, n) = real(rate_with_signal - rate_interference_only) / cb;
+        for pos = U:-1:1
+            logdet_interf = suffix_next_logdet;
+            suffix_sum = suffix_sum + suffix_cache{pos};
+            logdet_signal = logdet_spd_local(eye_Ly + suffix_sum);
+            suffix_next_logdet = logdet_signal;
+            user_idx = order(pos);
+            rate_bits = (logdet_signal - logdet_interf) * inv_log2 / cb;
+            b_achieved(user_idx, n) = real(rate_bits);
         end
 
     end
 
     bu_achieved = sum(b_achieved, 2);
+end
+
+function M = symmetrize_local(M)
+    M = 0.5 * (M + M');
+end
+
+function val = logdet_spd_local(M)
+    M = symmetrize_local(M);
+    [L, flag] = chol(M, 'lower');
+
+    if flag ~= 0
+        diag_jitter = 1e-9;
+        M = M + diag_jitter * eye(size(M, 1));
+        L = chol(M, 'lower');
+    end
+
+    val = 2 * sum(log(diag(L)));
 end
 
 function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing_mimo(H, ...
