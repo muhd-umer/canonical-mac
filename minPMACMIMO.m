@@ -65,10 +65,12 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
 
     % initialize ellipsoid
     [A, theta] = startEllipse_mimo(H, bu_internal, w, cb, Lx, idx_start, idx_end);
+    Rxx_warm = [];
 
     while true
         % solve dual problem for current theta
-        [~, bun_internal, Rxx_opt] = Lag_dual_f_mimo(H, theta, w, bu_scaled, Lx, idx_start, idx_end);
+        [~, bun_internal, Rxx_opt] = Lag_dual_f_mimo(H, theta, w, bu_scaled, Lx, idx_start, idx_end, Rxx_warm);
+        Rxx_warm = Rxx_opt;
 
         % compute subgradient
         g = sum(bun_internal, 2) - bu_scaled;
