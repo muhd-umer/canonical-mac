@@ -128,17 +128,21 @@ function [f, b, Rxx, state_out] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_
 
 end
 
-function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, alpha, w)
-    % evaluate dual objective and its gradient for the current covariance set.
+function [F, grad_phi_blocks, R_blocks] = compute_objective_and_gradient(H_blocks, B_blocks, alpha, w)
+    % evaluate dual objective and gradient for given B blocks
     U = numel(H_blocks);
     Ly = size(H_blocks{1}, 1);
     eye_Ly = eye(Ly);
     S = eye_Ly;
     logdets = zeros(U, 1);
-    chol_factors = cell(U, 1);
+    invS_cache = cell(U, 1);
+    energy_term = 0;
 
     for u = 1:U
-        S = S + H_blocks{u} * R_blocks{u} * H_blocks{u}';
+        Hu = H_blocks{u};
+        Bu = B_blocks{u};
+        HB = Hu * Bu;
+        S = S + HB * HB';
         S = 0.5 * (S + S');
         [L, flag] = chol(S, 'lower');
 
@@ -147,36 +151,28 @@ function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, a
             L = chol(S, 'lower');
         end
 
-        chol_factors{u} = L;
         logdets(u) = 2 * sum(log(diag(L)));
-    end
-
-    energy_term = 0;
-
-    for u = 1:U
-        energy_term = energy_term + w(u) * real(trace(R_blocks{u}));
+        Linv = L \ eye_Ly;
+        invS = Linv' * Linv;
+        invS_cache{u} = 0.5 * (invS + invS');
+        energy_term = energy_term + w(u) * sum(real(conj(Bu(:)) .* Bu(:)));
     end
 
     F = sum(alpha .* logdets) - energy_term;
+    grad_phi_blocks = cell(U, 1);
+    R_blocks = cell(U, 1);
+    tail = zeros(Ly, Ly);
 
-    if nargout >= 2
-        grad_blocks = cell(U, 1);
-
-        for u = 1:U
-            Hu = H_blocks{u};
-            Lu = size(R_blocks{u}, 1);
-            grad_u = -w(u) * eye(Lu);
-
-            for k = u:U
-                Lk = chol_factors{k};
-                Y = Lk \ Hu;
-                Z = Lk' \ Y;
-                grad_u = grad_u + alpha(k) * (Hu' * Z);
-            end
-
-            grad_blocks{u} = 0.5 * (grad_u + grad_u');
-        end
-
+    for u = U:-1:1
+        tail = tail + alpha(u) * invS_cache{u};
+        Hu = H_blocks{u};
+        Bu = B_blocks{u};
+        Lu = size(Bu, 1);
+        grad_R = Hu' * (tail * Hu) - w(u) * eye(Lu);
+        grad_R = 0.5 * (grad_R + grad_R');
+        grad_phi_blocks{u} = -2 * grad_R * Bu;
+        Ru = Bu * Bu';
+        R_blocks{u} = 0.5 * (Ru + Ru');
     end
 
 end
@@ -352,21 +348,7 @@ end
 
 function [phi, F_val, grad_vec, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes)
     B_blocks = unpack_complex_blocks(x, block_sizes);
-    U = numel(B_blocks);
-    R_blocks = cell(U, 1);
-
-    for u = 1:U
-        BBH = B_blocks{u} * B_blocks{u}';
-        R_blocks{u} = 0.5 * (BBH + BBH');
-    end
-
-    [F_val, grad_R] = compute_objective_and_gradient(H_blocks, R_blocks, alpha, w);
-    grad_blocks = cell(U, 1);
-
-    for u = 1:U
-        grad_blocks{u} = -2 * grad_R{u} * B_blocks{u};
-    end
-
+    [F_val, grad_blocks, R_blocks] = compute_objective_and_gradient(H_blocks, B_blocks, alpha, w);
     grad_vec = pack_complex_blocks(grad_blocks, block_sizes);
     phi = -F_val;
 end
