@@ -231,7 +231,7 @@ function [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx, order, 
     end
 
     eye_Ly = eye(Ly);
-    inv_log2 = 1 / log(2);
+    inv_log2_cb = 1 / (log(2) * cb);
     suffix_cache = cell(U, 1);
 
     for n = 1:N
@@ -241,7 +241,8 @@ function [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx, order, 
             cols = cols_per_order{k};
             Hv = H(:, cols, n);
             Rv = Rn(cols, cols);
-            suffix_cache{k} = symmetrize_local(Hv * (Rv * Hv'));
+            HRH = Hv * (Rv * Hv');
+            suffix_cache{k} = 0.5 * (HRH + HRH');
         end
 
         suffix_sum = zeros(Ly, Ly);
@@ -250,33 +251,25 @@ function [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx, order, 
         for pos = U:-1:1
             logdet_interf = suffix_next_logdet;
             suffix_sum = suffix_sum + suffix_cache{pos};
-            logdet_signal = logdet_spd_local(eye_Ly + suffix_sum);
+            S = eye_Ly + suffix_sum;
+            S = 0.5 * (S + S');
+            [L, flag] = chol(S, 'lower');
+
+            if flag ~= 0
+                S = S +1e-9 * eye_Ly;
+                L = chol(S, 'lower');
+            end
+
+            logdet_signal = 2 * sum(log(diag(L)));
             suffix_next_logdet = logdet_signal;
             user_idx = order(pos);
-            rate_bits = (logdet_signal - logdet_interf) * inv_log2 / cb;
+            rate_bits = (logdet_signal - logdet_interf) * inv_log2_cb;
             b_achieved(user_idx, n) = real(rate_bits);
         end
 
     end
 
     bu_achieved = sum(b_achieved, 2);
-end
-
-function M = symmetrize_local(M)
-    M = 0.5 * (M + M');
-end
-
-function val = logdet_spd_local(M)
-    M = symmetrize_local(M);
-    [L, flag] = chol(M, 'lower');
-
-    if flag ~= 0
-        diag_jitter = 1e-9;
-        M = M + diag_jitter * eye(size(M, 1));
-        L = chol(M, 'lower');
-    end
-
-    val = 2 * sum(log(diag(L)));
 end
 
 function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing_mimo(H, ...

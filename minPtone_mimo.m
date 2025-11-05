@@ -74,7 +74,8 @@ function [f, b, Rxx, state_out] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_
             for u = 1:U
                 orig = order(u);
                 cols = idx_start(orig):idx_end(orig);
-                R_init_blocks{u} = symmetrize(R_init(cols, cols));
+                Ru = R_init(cols, cols);
+                R_init_blocks{u} = 0.5 * (Ru + Ru');
             end
 
         end
@@ -91,8 +92,9 @@ function [f, b, Rxx, state_out] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_
 
     for u = 1:U
         S_curr = S_prev + H_blocks{u} * R_blocks{u} * H_blocks{u}';
+        S_curr = 0.5 * (S_curr + S_curr');
         b_sorted(u) = 0.5 * real(logdet_spd(S_curr) - logdet_spd(S_prev));
-        S_prev = symmetrize(S_curr);
+        S_prev = S_curr;
     end
 
     % map rates back to original ordering
@@ -106,7 +108,8 @@ function [f, b, Rxx, state_out] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_
     for u = 1:U
         orig = order(u);
         cols = idx_start(orig):idx_end(orig);
-        Rxx(cols, cols) = symmetrize(R_blocks{u});
+        Ru = R_blocks{u};
+        Rxx(cols, cols) = 0.5 * (Ru + Ru');
     end
 
     % objective value
@@ -129,17 +132,18 @@ function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, a
     % evaluate dual objective and its gradient for the current covariance set.
     U = numel(H_blocks);
     Ly = size(H_blocks{1}, 1);
-    S = eye(Ly);
+    eye_Ly = eye(Ly);
+    S = eye_Ly;
     logdets = zeros(U, 1);
     chol_factors = cell(U, 1);
 
     for u = 1:U
         S = S + H_blocks{u} * R_blocks{u} * H_blocks{u}';
-        S = symmetrize(S);
+        S = 0.5 * (S + S');
         [L, flag] = chol(S, 'lower');
 
         if flag ~= 0
-            S = S +1e-9 * eye(Ly);
+            S = S +1e-9 * eye_Ly;
             L = chol(S, 'lower');
         end
 
@@ -150,7 +154,7 @@ function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, a
     energy_term = 0;
 
     for u = 1:U
-        energy_term = energy_term + w(u) * trace(R_blocks{u});
+        energy_term = energy_term + w(u) * real(trace(R_blocks{u}));
     end
 
     F = sum(alpha .* logdets) - energy_term;
@@ -160,7 +164,8 @@ function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, a
 
         for u = 1:U
             Hu = H_blocks{u};
-            grad_u = zeros(size(R_blocks{u}));
+            Lu = size(R_blocks{u}, 1);
+            grad_u = -w(u) * eye(Lu);
 
             for k = u:U
                 Lk = chol_factors{k};
@@ -169,8 +174,7 @@ function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, a
                 grad_u = grad_u + alpha(k) * (Hu' * Z);
             end
 
-            grad_u = grad_u - w(u) * eye(size(grad_u, 1));
-            grad_blocks{u} = symmetrize(grad_u);
+            grad_blocks{u} = 0.5 * (grad_u + grad_u');
         end
 
     end
@@ -178,15 +182,15 @@ function [F, grad_blocks] = compute_objective_and_gradient(H_blocks, R_blocks, a
 end
 
 function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, block_sizes, R_init_blocks, state_in)
-    % lbfgs parameters tuned for fast convergence on smooth dual
-    max_it = 200;
-    tol_grad = 1e-6;
-    m_hist = 10;
+    % lbfgs parameters
+    max_it = 100;
+    tol_grad = 1e-5;
+    m_hist = 7;
     step_init = 1.0;
     step_min = 1e-10;
     beta = 0.5;
     armijo_c = 1e-4;
-    max_linesearch = 15;
+    max_linesearch = 10;
     U = numel(H_blocks);
 
     if nargin < 6
@@ -205,7 +209,8 @@ function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, 
         for u = 1:U
 
             if ~isempty(R_init_blocks)
-                Ru = symmetrize(R_init_blocks{u});
+                Ru = R_init_blocks{u};
+                Ru = 0.5 * (Ru + Ru'); % inline symmetrize
                 B_blocks{u} = initialize_factor(Ru);
             else
                 B_blocks{u} = sqrt(1e-6) * eye(block_sizes(u));
@@ -351,7 +356,8 @@ function [phi, F_val, grad_vec, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_
     R_blocks = cell(U, 1);
 
     for u = 1:U
-        R_blocks{u} = symmetrize(B_blocks{u} * B_blocks{u}');
+        BBH = B_blocks{u} * B_blocks{u}';
+        R_blocks{u} = 0.5 * (BBH + BBH');
     end
 
     [F_val, grad_R] = compute_objective_and_gradient(H_blocks, R_blocks, alpha, w);
@@ -558,7 +564,7 @@ function B = initialize_factor(R)
         return;
     end
 
-    R = symmetrize(R);
+    R = 0.5 * (R + R');
     [L, flag] = chol(R, 'lower');
 
     if flag == 0
@@ -573,21 +579,8 @@ function B = initialize_factor(R)
     B = V * diag(sqrt(d));
 end
 
-function A = symmetrize(A)
-    A = 0.5 * (A + A');
-end
-
-function R = project_to_psd(M)
-    M = symmetrize(M);
-    [V, D] = eig(M);
-    d = real(diag(D));
-    d(d < 0) = 0;
-    R = V * diag(d) * V';
-    R = symmetrize(R);
-end
-
 function val = logdet_spd(M)
-    M = symmetrize(M);
+    M = 0.5 * (M + M');
     [L, flag] = chol(M, 'lower');
 
     if flag ~= 0
