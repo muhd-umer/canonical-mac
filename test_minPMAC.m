@@ -82,7 +82,7 @@ Ly = 4;
 Lx = [3, 2, 4, 2, 1, 2];
 U = length(Lx);
 Ltot = sum(Lx);
-N = 8;
+N = 64;
 H_large = zeros(Ly, Ltot, N);
 
 for n = 1:N
