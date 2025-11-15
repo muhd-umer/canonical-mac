@@ -6,5 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "cvxpy[cvxopt,mosek]>=1.7.3",
+    "numba-cuda[cu12]>=0.20.1",
     "optuna>=4.5.0",
 ]
