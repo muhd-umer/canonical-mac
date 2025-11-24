@@ -147,8 +147,15 @@ function [F, grad_phi_blocks, R_blocks] = compute_objective_and_gradient(H_block
         [L, flag] = chol(S, 'lower');
 
         if flag ~= 0
-            S = S +1e-9 * eye_Ly;
-            L = chol(S, 'lower');
+            [L, flag] = chol(S +1e-6 * eye_Ly, 'lower');
+        end
+
+        % if still failing, signal failure to backtracking line search
+        if flag ~= 0
+            F = -Inf;
+            grad_phi_blocks = [];
+            R_blocks = [];
+            return;
         end
 
         logdets(u) = 2 * sum(log(diag(L)));
@@ -225,6 +232,18 @@ function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, 
     end
 
     [phi, F_opt, grad, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes);
+
+    if isinf(phi)
+        for u = 1:U
+            B_blocks{u} = sqrt(1e-6) * eye(block_sizes(u));
+        end
+
+        x = pack_complex_blocks(B_blocks, block_sizes);
+        S_hist = cell(0, 1);
+        Y_hist = cell(0, 1);
+        [phi, F_opt, grad, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes);
+    end
+
     grad_norm = norm(grad);
 
     for iter = 1:max_it
@@ -349,6 +368,13 @@ end
 function [phi, F_val, grad_vec, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes)
     B_blocks = unpack_complex_blocks(x, block_sizes);
     [F_val, grad_blocks, R_blocks] = compute_objective_and_gradient(H_blocks, B_blocks, alpha, w);
+
+    if F_val == -Inf
+        phi = Inf;
+        grad_vec = [];
+        return;
+    end
+
     grad_vec = pack_complex_blocks(grad_blocks, block_sizes);
     phi = -F_val;
 end
@@ -566,8 +592,13 @@ function val = logdet_spd(M)
     [L, flag] = chol(M, 'lower');
 
     if flag ~= 0
-        M = M +1e-9 * eye(size(M, 1));
-        L = chol(M, 'lower');
+        M = M +1e-6 * eye(size(M, 1));
+        [L, flag] = chol(M, 'lower');
+    end
+
+    if flag ~= 0
+        val = -Inf;
+        return;
     end
 
     val = 2 * sum(log(diag(L)));
