@@ -129,8 +129,9 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         bu_a = bu_achieved';
 
         % store single-order results
+        % Pass bu_achieved (U x 1) as the average rate vector
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
-            clusters, {order}, 1, {Rxx_opt}, bu_achieved, b_achieved, 'Solved', ...
+            clusters, {order}, 1, {Rxx_opt}, bu_achieved, b_achieved, bu_achieved, 'Solved', ...
             idx_start, idx_end);
         info.frac = [];
         info.bun = b_achieved;
@@ -151,6 +152,8 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         % compute weighted average of achieved rates
         weights = weights(:);
         bu_a = (bu_vertices * weights)';
+        bu_avg_col = bu_a';
+
         bun_avg = zeros(U, N);
 
         for k = 1:length(weights)
@@ -162,7 +165,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
 
         % store time-sharing results
         info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
-            clusters, orderings, weights, {Rxx_opt}, bu_vertices, bun_orders, 'Solved', ...
+            clusters, orderings, weights, {Rxx_opt}, bu_vertices, bun_orders, bu_avg_col, 'Solved', ...
             idx_start, idx_end);
         info.frac = weights;
         info.bun = bun_avg;
@@ -329,7 +332,7 @@ function Eu_avg = compute_average_energies_mimo(Rxx, U, N, Lx, idx_start, idx_en
 end
 
 function info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
-        clusters, orderings, weights, Rxx_cell, bu_vertices, b_achieved, cvx_status, ...
+        clusters, orderings, weights, Rxx_cell, bu_vertices, b_achieved, bu_avg, cvx_status, ...
         idx_start, idx_end)
     info = struct();
     info.H = H;
@@ -345,6 +348,7 @@ function info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_uniqu
     info.Rxx = Rxx_cell;
     info.bu_vertices = bu_vertices;
     info.b_achieved = b_achieved;
+    info.bu_achieved = bu_avg;
     info.sol_status = cvx_status;
     info.feasible = true;
     info.idx_start = idx_start;
