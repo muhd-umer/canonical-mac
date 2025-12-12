@@ -1,7 +1,7 @@
 [project]
-name = "minpmac"
+name = "multiuser-opt"
 version = "0.1.0"
-description = "minPMAC"
+description = "Toolbox for multi-user MIMO optimization"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
