@@ -186,14 +186,14 @@ end
 
 function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, block_sizes, R_init_blocks, state_in)
     % lbfgs parameters
-    max_it = 150;
-    tol_grad = 1e-5;
-    m_hist = 8;
+    max_it = 200;
+    tol_grad = 1e-6;
+    m_hist = 12;
     step_init = 1.0;
-    step_min = 1e-10;
-    beta = 0.3;
-    armijo_c = 3.33e-04;
-    max_linesearch = 18;
+    step_min = 1e-12;
+    beta = 0.5;
+    armijo_c = 1e-4;
+    max_linesearch = 24;
     U = numel(H_blocks);
 
     if nargin < 6
