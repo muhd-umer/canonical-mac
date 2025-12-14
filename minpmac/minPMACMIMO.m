@@ -64,13 +64,13 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     count = 0;
 
     % initialize ellipsoid
-    [A, theta] = startEllipse_mimo(H, bu_internal, w, cb, Lx, idx_start, idx_end);
+    [A, theta] = init_ellipsoid(H, bu_internal, w, cb, Lx, idx_start, idx_end);
     Rxx_warm = [];
     state_warm = cell(N, 1);
 
     while true
         % solve dual problem for current theta
-        [~, bun_internal, Rxx_opt, state_warm] = Lag_dual_f_mimo(H, theta, w, bu_scaled, Lx, idx_start, idx_end, Rxx_warm, state_warm);
+        [~, bun_internal, Rxx_opt, state_warm] = eval_lagfunc(H, theta, w, bu_scaled, Lx, idx_start, idx_end, Rxx_warm, state_warm);
         Rxx_warm = Rxx_opt;
 
         % compute subgradient
@@ -122,7 +122,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     if size(all_orders, 1) == 1
         % single decoding order
         order = all_orders(1, :);
-        [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx_opt, order, ...
+        [bu_achieved, b_achieved] = compute_rates(H, Rxx_opt, order, ...
             Ly, U, N, cb, Lx, idx_start, idx_end);
 
         FEAS_FLAG = 1;
@@ -130,7 +130,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
 
         % store single-order results
         % Pass bu_achieved (U x 1) as the average rate vector
-        info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
+        info = create_info_struct(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, {order}, 1, {Rxx_opt}, bu_achieved, b_achieved, bu_achieved, 'Solved', ...
             idx_start, idx_end);
         info.frac = [];
@@ -138,7 +138,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
 
     else
         % multiple orders; solve for time-sharing weights
-        [weights, bu_vertices, bun_orders, orderings] = solve_time_sharing_mimo(H, ...
+        [weights, bu_vertices, bun_orders, orderings] = solve_time_sharing(H, ...
             Rxx_opt, all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end);
 
         if isempty(weights)
@@ -164,7 +164,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         FEAS_FLAG = 2;
 
         % store time-sharing results
-        info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
+        info = create_info_struct(H, Lx, bu_min, w, cb, theta, theta_unique, ...
             clusters, orderings, weights, {Rxx_opt}, bu_vertices, bun_orders, bu_avg_col, 'Solved', ...
             idx_start, idx_end);
         info.frac = weights;
@@ -173,7 +173,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     end
 
     % compute average energies
-    info.Eu_avg = compute_average_energies_mimo(Rxx_opt, U, N, Lx, idx_start, idx_end);
+    info.Eu_avg = compute_avg_energies(Rxx_opt, U, N, Lx, idx_start, idx_end);
     info.elapsed_time = toc;
 
     fprintf('minPMACMIMO completed in %.3f seconds, FEAS_FLAG=%d\n', info.elapsed_time, FEAS_FLAG);
@@ -223,7 +223,7 @@ function orders = generate_decoding_orders(clusters)
 
 end
 
-function [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx, order, ...
+function [bu_achieved, b_achieved] = compute_rates(H, Rxx, order, ...
         Ly, U, N, cb, Lx, idx_start, idx_end)
     b_achieved = zeros(U, N);
     cols_per_order = cell(U, 1);
@@ -275,7 +275,7 @@ function [bu_achieved, b_achieved] = compute_achieved_rates_mimo(H, Rxx, order, 
     bu_achieved = sum(b_achieved, 2);
 end
 
-function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing_mimo(H, ...
+function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing(H, ...
         Rxx, orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end)
     num_orders = size(orders, 1);
     bu_vertices = zeros(U, num_orders);
@@ -284,7 +284,7 @@ function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing_mi
 
     for k = 1:num_orders
         orderings{k} = orders(k, :);
-        [bu_achieved, bun_matrix] = compute_achieved_rates_mimo(H, Rxx, orders(k, :), ...
+        [bu_achieved, bun_matrix] = compute_rates(H, Rxx, orders(k, :), ...
             Ly, U, N, cb, Lx, idx_start, idx_end);
         bu_vertices(:, k) = bu_achieved;
         bun_vertices{k} = bun_matrix;
@@ -315,7 +315,7 @@ function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing_mi
     orderings = orderings(active_idx);
 end
 
-function Eu_avg = compute_average_energies_mimo(Rxx, U, N, Lx, idx_start, idx_end)
+function Eu_avg = compute_avg_energies(Rxx, U, N, Lx, idx_start, idx_end)
     Eu_avg = zeros(1, U);
 
     for u = 1:U
@@ -331,7 +331,7 @@ function Eu_avg = compute_average_energies_mimo(Rxx, U, N, Lx, idx_start, idx_en
 
 end
 
-function info = create_info_struct_mimo(H, Lx, bu_min, w, cb, theta, theta_unique, ...
+function info = create_info_struct(H, Lx, bu_min, w, cb, theta, theta_unique, ...
         clusters, orderings, weights, Rxx_cell, bu_vertices, b_achieved, bu_avg, cvx_status, ...
         idx_start, idx_end)
     info = struct();

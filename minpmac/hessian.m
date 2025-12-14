@@ -1,5 +1,8 @@
-function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
-    %HESSIAN_MIMO Compute gradient and Hessian contributions for MIMO users
+function [g, H] = hessian(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
+    %HESSIAN Compute gradient and Hessian contributions for MIMO users
+    %   [g, H] = HESSIAN(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
+    %   computes the gradient and Hessian of the Lagrangian with respect to
+    %   the transmit covariance matrices for the min-power MAC problem.
 
     U = length(Lx);
     Ltot = sum(Lx);
@@ -52,8 +55,6 @@ function [g, H] = Hessian_mimo(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind,
         grad_u = grad_u - w(u) * eye(Lx(ind(u)));
 
         % place in vectorized gradient
-        row_start = (ant_idx(1) - 1) * Ltot + ant_idx(1);
-        row_end = ant_idx(end) * Ltot;
         g_indices = [];
 
         for i = 1:length(ant_idx)

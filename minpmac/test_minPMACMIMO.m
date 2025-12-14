@@ -1,4 +1,4 @@
-%TEST_MINPMAC Collection of tests for minPMACMIMO
+%TEST_MINPMACMIMO Collection of tests for minPMACMIMO
 
 clear;
 clc;

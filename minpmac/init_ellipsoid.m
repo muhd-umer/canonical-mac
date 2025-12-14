@@ -1,8 +1,22 @@
-function [A, g, w] = startEllipse_mimo(H, bu, w, cb, Lx, idx_start, idx_end)
-    %STARTELLIPSE_MIMO Initialize ellipsoid method for MIMO MAC
-    %   [A, g, w] = STARTELLIPSE_MIMO(H, bu, w, cb, Lx, idx_start, idx_end) returns
-    %   the initial ellipsoid shape matrix and center for the minPMAC solver by
-    %   approximating user energies via successive water-filling sweeps.
+function [A, g, w] = init_ellipsoid(H, bu, w, cb, Lx, idx_start, idx_end)
+    %INIT_ELLIPSOID Initialize ellipsoid method for MIMO MAC
+    %   [A, g, w] = INIT_ELLIPSOID(H, bu, w, cb, Lx, idx_start, idx_end)
+    %   returns the initial ellipsoid shape matrix and center for the minPMAC
+    %   solver by approximating user energies via successive water-filling sweeps.
+    %
+    %   Inputs:
+    %       H           channel tensor [Ly, Ltot, N]
+    %       bu          1-by-U target rates
+    %       w           1-by-U energy weights
+    %       cb          baseband type (1=complex, 2=real)
+    %       Lx          1-by-U antennas per user
+    %       idx_start   1-by-U starting antenna indices
+    %       idx_end     1-by-U ending antenna indices
+    %
+    %   Outputs:
+    %       A           U x U initial ellipsoid shape matrix
+    %       g           U x 1 initial ellipsoid center
+    %       w           (pass-through) energy weights
 
     [Ly, Ltot, N] = size(H);
     U = length(Lx);
@@ -39,8 +53,7 @@ function [A, g, w] = startEllipse_mimo(H, bu, w, cb, Lx, idx_start, idx_end)
                             Rnoise(:, :, index) = Rnoise(:, :, index) + ...
                                 en(u2, index) * H_u2 * H_u2';
                         else
-                            % for mimo, need covariance matrix (not implemented in init)
-                            % use scalar approximation
+                            % for mimo, use scalar approximation
                             energy_per_ant = en(u2, index) / Lx(u2);
                             Rnoise(:, :, index) = Rnoise(:, :, index) + ...
                                 energy_per_ant * (H_u2 * H_u2');

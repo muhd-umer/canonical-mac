@@ -1,10 +1,10 @@
-function [f, b, Rxx, state_out] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_end, R_init, state_in)
-    %MINPTONE_MIMO Dual maximization on a single tone for MIMO MAC
-    %   [f, b, Rxx] = MINPTONE_MIMO(H, theta, w, Lx, idx_start, idx_end) solves the
-    %   per-tone Lagrangian maximization that appears inside the ellipsoid method
-    %   for the MIMO minPMAC problem. This implementation avoids CVX and works
-    %   directly with the covariance matrices for each user by applying a limited
-    %   memory quasi-newton ascent on the dual objective.
+function [f, b, Rxx, state_out] = solve_dual_tone(H, theta, w, Lx, idx_start, idx_end, R_init, state_in)
+    %SOLVE_DUAL_TONE Dual maximization on a single tone for MIMO MAC
+    %   [f, b, Rxx, state_out] = SOLVE_DUAL_TONE(H, theta, w, Lx, idx_start, idx_end, ...)
+    %   solves the per-tone Lagrangian maximization that appears inside the
+    %   ellipsoid method for the MIMO minPMAC problem. This implementation avoids
+    %   CVX and works directly with the covariance matrices for each user by
+    %   applying a limited memory quasi-newton ascent on the dual objective.
     %
     %   Inputs:
     %       H           Ly-by-Ltot channel matrix for this tone (users stacked).
@@ -128,7 +128,7 @@ function [f, b, Rxx, state_out] = minPtone_mimo(H, theta, w, Lx, idx_start, idx_
 
 end
 
-function [F, grad_phi_blocks, R_blocks] = compute_objective_and_gradient(H_blocks, B_blocks, alpha, w)
+function [F, grad_phi_blocks, R_blocks] = eval_gradobj(H_blocks, B_blocks, alpha, w)
     % evaluate dual objective and gradient for given B blocks
     U = numel(H_blocks);
     Ly = size(H_blocks{1}, 1);
@@ -231,9 +231,10 @@ function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, 
         [S_hist, Y_hist] = sanitize_history(S_hist, Y_hist, numel(x), m_hist);
     end
 
-    [phi, F_opt, grad, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes);
+    [phi, F_opt, grad, B_blocks, R_blocks] = eval_lbfgs_state(x, H_blocks, alpha, w, block_sizes);
 
     if isinf(phi)
+
         for u = 1:U
             B_blocks{u} = sqrt(1e-6) * eye(block_sizes(u));
         end
@@ -241,7 +242,7 @@ function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, 
         x = pack_complex_blocks(B_blocks, block_sizes);
         S_hist = cell(0, 1);
         Y_hist = cell(0, 1);
-        [phi, F_opt, grad, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes);
+        [phi, F_opt, grad, B_blocks, R_blocks] = eval_lbfgs_state(x, H_blocks, alpha, w, block_sizes);
     end
 
     grad_norm = norm(grad);
@@ -272,7 +273,7 @@ function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, 
 
         for ls = 1:max_linesearch
             x_trial = x + step * direction;
-            [phi_trial, F_trial, grad_trial, B_trial, R_trial] = evaluate_lbfgs_state(x_trial, H_blocks, alpha, w, block_sizes);
+            [phi_trial, F_trial, grad_trial, B_trial, R_trial] = eval_lbfgs_state(x_trial, H_blocks, alpha, w, block_sizes);
 
             if phi_trial <= phi + armijo_c * step * dir_deriv
                 accepted = true;
@@ -300,7 +301,7 @@ function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, 
 
             for ls = 1:max_linesearch
                 x_trial = x + step * direction;
-                [phi_trial, F_trial, grad_trial, B_trial, R_trial] = evaluate_lbfgs_state(x_trial, H_blocks, alpha, w, block_sizes);
+                [phi_trial, F_trial, grad_trial, B_trial, R_trial] = eval_lbfgs_state(x_trial, H_blocks, alpha, w, block_sizes);
 
                 if phi_trial <= phi + armijo_c * step * dir_deriv
                     accepted = true;
@@ -365,9 +366,9 @@ function [R_blocks, F_opt, state_out] = maximize_dual_lbfgs(H_blocks, alpha, w, 
     state_out.F = F_opt;
 end
 
-function [phi, F_val, grad_vec, B_blocks, R_blocks] = evaluate_lbfgs_state(x, H_blocks, alpha, w, block_sizes)
+function [phi, F_val, grad_vec, B_blocks, R_blocks] = eval_lbfgs_state(x, H_blocks, alpha, w, block_sizes)
     B_blocks = unpack_complex_blocks(x, block_sizes);
-    [F_val, grad_blocks, R_blocks] = compute_objective_and_gradient(H_blocks, B_blocks, alpha, w);
+    [F_val, grad_blocks, R_blocks] = eval_gradobj(H_blocks, B_blocks, alpha, w);
 
     if F_val == -Inf
         phi = Inf;
