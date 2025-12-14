@@ -60,7 +60,7 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO_cvx(H, Lxu, Eu, theta, cb)
     theta = reshape(theta, [], 1);
     [stheta, idx] = sort(theta, 'descend');
     delta = -diff([stheta; 0]);
-    U = length(Eu);
+    U = length(theta);
 
     if length(Lxu) == 1
         Lxu = ones(1, U) * Lxu;
@@ -94,7 +94,7 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO_cvx(H, Lxu, Eu, theta, cb)
 
     maximize sum(delta' * r)
     subject to
-    w:sum(sum(Eun, 2)) <= Eu;
+    w:sum(sum(Eun)) <= sum(Eu);
 
     for u = 1:U
 
