@@ -1,8 +1,8 @@
-function [FEAS_FLAG, bu_a, info] = minPMACMIMO_reftd(H, Lx, bu_min, w, cb)
-    % MINPMACMIMO_REFTD Minimum power multi-user MIMO MAC with heterogeneous antennas
+function [FEAS_FLAG, bu_a, info] = minPMACMIMO_cvx(H, Lx, bu_min, w, cb)
+    % MINPMACMIMO_cvx Minimum power multi-user MIMO MAC with heterogeneous antennas
     %
     % SYNTAX:
-    %   [FEAS_FLAG, bu_a, info] = minPMACMIMO_reftd(H, Lx, bu_min, w, cb)
+    %   [FEAS_FLAG, bu_a, info] = minPMACMIMO_cvx(H, Lx, bu_min, w, cb)
     %
     % INPUTS:
     %   H       - Channel matrix [Ly, sum(Lx), N] concatenated across users
@@ -18,7 +18,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO_reftd(H, Lx, bu_min, w, cb)
     %
     % EXAMPLE:
     %   Lx = [2, 3, 2]; H = randn(4,7,8) + 1j*randn(4,7,8);  % 4 RX, 7 total TX, 8 tones
-    %   [flag, rates, info] = minPMACMIMO_reftd(H, Lx, [3 3 3], [1 1 1], 1);
+    %   [flag, rates, info] = minPMACMIMO_cvx(H, Lx, [3 3 3], [1 1 1], 1);
 
     tic;
     [Ly, Ltot, N] = size(H);

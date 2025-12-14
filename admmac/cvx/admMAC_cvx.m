@@ -43,7 +43,7 @@
 %
 %      Subroutines called
 %       - maxRMAC_cvx
-%       - maxRMACMIMO
+%       - maxRMACMIMO_cvx
 %************************************************************************
 function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMAC_cvx(H, Lxu, bu, Eu, cb)
 
@@ -75,7 +75,7 @@ while 1
         [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb);
         Rxxstemp = num2cell(Eun);
     else
-        [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu_now, theta , cb);
+        [Rxxs, Eun, w, bun] = maxRMACMIMO_cvx(H, Lxu, Eu_now, theta , cb);
         Rxxstemp=Rxxs;
     end
     bu_v=sum(bun,2);

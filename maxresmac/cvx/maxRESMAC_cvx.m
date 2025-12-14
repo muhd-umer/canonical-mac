@@ -1,40 +1,37 @@
-% function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
+% function [Eun, w, bun] = maxRESMAC_cvx(H, Eu, theta, cb)
 %
 % maxRMAC_cvx Maximizes weighted rate sum subject to energy constraint, each
 % user has ONLY ONE transmit antenna. It uses CVX and mosek. It only works
 % for Lxu=1 on all users.
 %
 %   INPUTS:
-%     H(:,u,n): Ly x U x N channel matrix. Ly = number of receiver antennas,
+% H(:,u,n): Ly x U x N channel matrix. Ly = number of receiver antennas,
 %     U = number of users and N = number of tones.
 %
 %     If the channel is real-bbd (cb=2), maxPMAC_cvx realizes user data rates
 %     over all the tones (or equivalently positive and negative
 %     freqs). This means the input H must be conjugate symmetric H_n =
 %     H_{N-n}^*.  The program will reduce N by 2 and focus energy on the
-%     lower half of frequencies. Thus N>1 must be even for real channels,
-%     with a special exception made for N=1.
+%     lower half of frequencies. Thus N>1 must be even for real channels.
+%     For real N=1 channel, the program runs and will produce half the data
+%     rates for the same complex N=1 channel.
 %
 %     By constast if cb=1 (cplx bbd), maxRMAC_cvx need not have a conjugate
 %     symmetric H and N is not reduced.
 %
-% Eu: 1 x U Energy constraint for each user as total energy per symbol.
-%     For N=1 channel, the program adjusts energy to be per complex (cb=1)
-%     symbol at the beginning and then restores at end.  cb=2 has no
-%     change.  So for N=1, the input Eu should be u's energy/symbol.
+% Eu: TOTAL SUM-ENERGY/symbol constraint for all user inputs.
 %
 % theta: weight on each user's rate, length-U vector.
 %
 % cb: =1 if H is complex baseband, and cb=2 if H is real baseband.
 %
-%
 %   OUTPUTS:
 % Eun:    U x N energy distribution. Eun(u,n) is user u's energy allocation
 %         on tone n.
-% w:      U x 1 Lagrangian multiplier w.r.t. energy constraints
-% bun:    U by N bit distributions for all users.
+% w:   U x 1 Lagrangian multiplier w.r.t. energy constraints
+% bun: U by N bit distributions for all users.
 % ***********************************************************************
-function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
+function [Eun, w, bun] = maxRESMAC_cvx(H, Eu, theta, cb)
     [Ly, U, N] = size(H);
 
     if N > 1
@@ -44,8 +41,6 @@ function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
             N = N / 2;
         end
 
-    else
-        Eu = Eu / (3 - cb);
     end
 
     Eu = reshape(Eu, [], 1);
@@ -53,12 +48,12 @@ function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
     [stheta, idx] = sort(theta, 'descend');
     delta = -diff([stheta; 0]);
     sH = H(:, idx, :);
-    Hs = zeros(Ly, Ly, U, N);
+    Gs = zeros(Ly, Ly, U, N);
 
-    for n = 1:N
+    parfor n = 1:N
 
         for u = 1:U
-            Hs(:, :, u, n) = sH(:, u, n) * sH(:, u, n)';
+            Gs(:, :, u, n) = sH(:, u, n) * sH(:, u, n)';
         end
 
     end
@@ -68,7 +63,7 @@ function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
     variable Eun(U, N) nonnegative
     dual variable w
     expression r(U, N)
-    S = cumsum(Hs .* repelem(reshape(Eun, 1, 1, U, N), Ly, Ly, 1, 1), 3);
+    S = cumsum(Gs .* repelem(reshape(Eun, 1, 1, U, N), Ly, Ly, 1, 1), 3);
 
     for u = 1:U
 
@@ -80,10 +75,10 @@ function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
 
     maximize sum(delta' * r)
     subject to
-    w:sum(Eun, 2) <= Eu;
+    w:sum(sum(Eun, 2)) <= Eu;
     cvx_end
 
-    S = cumsum(Hs .* repelem(reshape(Eun, 1, 1, U, N), Ly, Ly, 1, 1), 3) + eye(Ly);
+    S = cumsum(Gs .* repelem(reshape(Eun, 1, 1, U, N), Ly, Ly, 1, 1), 3) + eye(Ly);
     cumrate = zeros(U, N);
 
     for u = 1:U
@@ -96,9 +91,4 @@ function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
 
     bun(idx, :) = diff([zeros(1, N); cumrate]);
     w(idx) = w;
-
-    if N == 1
-        Eun = (3 - cb) * Eun;
-    end
-
 end

@@ -38,7 +38,7 @@ energy_weights = ones(1, U);
 fprintf('::: Running Symmetric Time-Sharing :::\n');
 
 try
-    [flag, bu_a, info] = minPMACMIMO_reftd(H_t, Lx, bu_min_target, energy_weights, cb);
+    [flag, bu_a, info] = minPMACMIMO_cvx(H_t, Lx, bu_min_target, energy_weights, cb);
 
     fprintf('\n::: Results :::\n');
     fprintf('FEAS_FLAG: %d\n', flag);

@@ -1,4 +1,4 @@
-% function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta , cb)
+% function [Rxxs, Eun, w, bun] = maxRMACMIMO_cvx(H, Lxu, Eu, theta , cb)
 %
 % maxRMAC_vector_cvx Maximize weighted rate sum subject to energy
 % constaint. This uses cvx and mosek. 
@@ -35,7 +35,7 @@
 % bun:    U by N bit distributions for all users.
 % bun: U by N bit distributions for all users.
 % **********************************************************************
-function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
+function [Rxxs, Eun, w, bun] = maxRMACMIMO_cvx(H, Lxu, Eu, theta, cb)
 
 UNIFORM_FLAG = 0;
 [Ly, ~, N] = size(H);
