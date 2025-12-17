@@ -8,7 +8,7 @@ function check_dependencies()
 
     % check for QuaDRiGa
     if ~exist('qd_layout', 'file')
-        warning('[ERROR] QuaDRiGa not found in MATLAB path\n');
+        warning('[warn] QuaDRiGa not found in MATLAB path\n');
         fprintf('Please install QuaDRiGa and add it to your MATLAB path\n');
         return;
     else
@@ -20,7 +20,7 @@ function check_dependencies()
         cvx_version;
         fprintf('  [p] CVX found\n');
     catch
-        warning('WARNING: CVX not found; multiuser optimization may fail\n');
+        warning('[warn] CVX not found; multiuser optimization may fail\n');
         fprintf('Please install CVX from http://cvxr.com/cvx/\n');
     end
 
@@ -29,7 +29,7 @@ function check_dependencies()
         mosekopt;
         fprintf('  [p] MOSEK found\n');
     catch
-        warning('WARNING: MOSEK not found; multiuser optimization may fail\n');
+        warning('[warn] MOSEK not found; multiuser optimization may fail\n');
         fprintf('Please install MOSEK from https://www.mosek.com/\n');
     end
 
