@@ -51,6 +51,7 @@ function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
     Eu = reshape(Eu, [], 1);
     theta = reshape(theta, [], 1);
     [stheta, idx] = sort(theta, 'descend');
+    Eu = Eu(idx);
     delta = -diff([stheta; 0]);
     sH = H(:, idx, :);
     Hs = zeros(Ly, Ly, U, N);
@@ -96,6 +97,9 @@ function [Eun, w, bun] = maxRMAC_cvx(H, Eu, theta, cb)
 
     bun(idx, :) = diff([zeros(1, N); cumrate]);
     w(idx) = w;
+    Eun_out = zeros(U, N);
+    Eun_out(idx, :) = Eun;
+    Eun = Eun_out;
 
     if N == 1
         Eun = (3 - cb) * Eun;
