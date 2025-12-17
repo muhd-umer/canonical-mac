@@ -57,17 +57,21 @@ try
 
     if isfield(info, 'orderings')
         fprintf('Number of decoding orders found: %d\n', length(info.orderings));
+
         if ~isempty(info.orderings)
+
             for o = 1:length(info.orderings)
                 fprintf('  Order p=%d: [%s]\n', o, num2str(info.orderings{o}));
             end
+
         end
+
     end
 
     fprintf('\n::: Outcome :::\n');
 
     if flag == 2
-        fprintf('[✓] SUCCESS: A FEASIBLE time-sharing solution was found (FEAS_FLAG = 2).\n');
+        fprintf('[p] SUCCESS: A FEASIBLE time-sharing solution was found (FEAS_FLAG = 2).\n');
         fprintf('    This confirms the code correctly handled the symmetric case with multiple orders.\n');
     elseif flag == 1
         fprintf('[!] WARNING: A single-order solution was found.\n');

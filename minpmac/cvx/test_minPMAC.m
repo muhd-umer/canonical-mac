@@ -123,6 +123,7 @@ run_test(@() minPMACMIMO(H_infeas, Lx, bu_min, w, cb), bu_min, true);
 %% helper functions
 
 function run_test(solver, target_rates, expect_infeasible)
+
     if nargin < 3
         expect_infeasible = false;
     end
@@ -153,18 +154,23 @@ function run_test(solver, target_rates, expect_infeasible)
             num_clusters, num_orders, elapsed);
 
         if expect_infeasible
+
             if flag == 0
-                fprintf('  [✓] infeasible case detected\n');
+                fprintf('  [p] infeasible case detected\n');
             else
                 fprintf('  [x] infeasible case not detected\n');
             end
+
         else
+
             if flag > 0
-                fprintf('  [✓] test passed\n');
+                fprintf('  [p] test passed\n');
             else
                 fprintf('  [x] test failed (infeasible)\n');
             end
+
         end
+
     catch ME
         fprintf('  [x] test crashed: %s\n', ME.message);
     end

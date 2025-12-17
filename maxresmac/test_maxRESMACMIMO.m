@@ -4,8 +4,7 @@ clear;
 clc;
 rng(42);
 
-%% test 1: basic SISO case
-fprintf('[test] Basic SISO (2 users, 4 tones)\n');
+fprintf('[test] basic siso (2 users, 4 tones)\n');
 H_siso = zeros(1, 2, 4);
 H_siso(:, :, 1) = [80 60];
 H_siso(:, :, 2) = [40 30];
@@ -16,10 +15,9 @@ Etotal = 5;
 theta = [1; 1];
 cb = 1;
 
-run_test(@() maxRESMACMIMO(H_siso, Lxu, Etotal, theta, cb), Etotal, theta, 'SISO Basic');
+run_test(@() maxRESMACMIMO(H_siso, Lxu, Etotal, theta, cb), Etotal, theta, 'basic siso');
 
-%% test 2: basic MIMO case
-fprintf('[test] Basic MIMO (2 users, 2x2, 2 tones)\n');
+fprintf('[test] basic mimo (2 users, 2x2, 2 tones)\n');
 Ly = 2;
 Lxu_mimo = [2 2];
 N = 2;
@@ -32,26 +30,23 @@ Etotal_mimo = 10;
 theta_mimo = [1; 1];
 
 run_test(@() maxRESMACMIMO(H_mimo, Lxu_mimo, Etotal_mimo, theta_mimo, cb), ...
-    Etotal_mimo, theta_mimo, 'MIMO 2x2');
+    Etotal_mimo, theta_mimo, 'basic mimo');
 
-%% test 3: single tone
-fprintf('[test] Single tone\n');
+fprintf('[test] single tone\n');
 H_single = zeros(1, 2, 1);
 H_single(:, :, 1) = [80 60];
 Etotal_single = 2;
 
 run_test(@() maxRESMACMIMO(H_single, Lxu, Etotal_single, theta, cb), ...
-    Etotal_single, theta, 'Single Tone');
+    Etotal_single, theta, 'single tone');
 
-%% test 4: unequal weights
-fprintf('[test] Unequal weights\n');
+fprintf('[test] unequal weights\n');
 theta_uneq = [1; 3];
 
 run_test(@() maxRESMACMIMO(H_siso, Lxu, Etotal, theta_uneq, cb), ...
-    Etotal, theta_uneq, 'Unequal Weights');
+    Etotal, theta_uneq, 'unequal weights');
 
-%% test 5: three users
-fprintf('[test] Three users\n');
+fprintf('[test] three users\n');
 H_3u = zeros(2, 3, 4);
 H_3u(:, :, 1) = [5 4 3; 4 5 4];
 H_3u(:, :, 2) = [4 3 5; 3 4 5];
@@ -62,10 +57,9 @@ theta_3u = [1; 1; 1];
 Etotal_3u = 6;
 
 run_test(@() maxRESMACMIMO(H_3u, Lxu_3u, Etotal_3u, theta_3u, cb), ...
-    Etotal_3u, theta_3u, 'Three Users');
+    Etotal_3u, theta_3u, 'three users');
 
-%% test 6: MIMO with unequal antennas
-fprintf('[test] MIMO with unequal antennas\n');
+fprintf('[test] mimo with unequal antennas\n');
 Ly = 3;
 Lxu_mixed = [2 3];
 N = 2;
@@ -74,10 +68,9 @@ Etotal_mixed = 8;
 theta_mixed = [1; 1.5];
 
 run_test(@() maxRESMACMIMO(H_mixed, Lxu_mixed, Etotal_mixed, theta_mixed, cb), ...
-    Etotal_mixed, theta_mixed, 'MIMO Unequal Antennas');
+    Etotal_mixed, theta_mixed, 'mimo unequal antennas');
 
-%% test 7: real baseband (cb=2)
-fprintf('[test] Real baseband\n');
+fprintf('[test] real baseband\n');
 H_real = zeros(1, 2, 4);
 H_real(:, :, 1) = [5 4];
 H_real(:, :, 2) = [3 2];
@@ -87,10 +80,9 @@ Etotal_real = 4;
 cb_real = 2;
 
 run_test(@() maxRESMACMIMO(H_real, Lxu, Etotal_real, theta, cb_real), ...
-    Etotal_real, theta, 'Real Baseband');
+    Etotal_real, theta, 'real baseband');
 
-%% test 8: stress test
-fprintf('[test] Stress test (6 users, 64 tones)\n');
+fprintf('[test] stress test\n');
 Ly = 4;
 Lxu_stress = [2 1 2 1 2 1];
 N = 64;
@@ -99,7 +91,7 @@ Etotal_stress = 30;
 theta_stress = [1; 2; 1.5; 0.5; 1.2; 0.8];
 
 run_test(@() maxRESMACMIMO(H_stress, Lxu_stress, Etotal_stress, theta_stress, cb), ...
-    Etotal_stress, theta_stress, 'Stress Test');
+    Etotal_stress, theta_stress, 'stress test');
 
 %% helper functions
 function run_test(solver, Etotal, theta, test_name)
@@ -128,14 +120,14 @@ function run_test(solver, Etotal, theta, test_name)
         energy_error = abs(total_energy - Etotal) / Etotal;
 
         if energy_error < 0.01
-            fprintf('  [%c] energy constraint satisfied\n', char(10003));
+            fprintf('  [p] energy constraint satisfied\n');
         else
             fprintf('  [x] energy constraint violated (error: %.2e)\n', energy_error);
         end
 
         % check non-negative rates
         if all(bun(:) >= -1e-6)
-            fprintf('  [%c] rates are non-negative\n', char(10003));
+            fprintf('  [p] rates are non-negative\n');
         else
             fprintf('  [x] some rates are negative\n');
         end
@@ -182,12 +174,12 @@ function run_test(solver, Etotal, theta, test_name)
         end
 
         if psd_ok
-            fprintf('  [%c] covariance matrices are PSD\n', char(10003));
+            fprintf('  [p] covariance matrices are PSD\n');
         else
             fprintf('  [x] some covariance matrices are not PSD\n');
         end
 
-        fprintf('  [%c] test passed\n', char(10003));
+        fprintf('  [p] test passed\n');
 
     catch ME
         fprintf('  [x] test crashed: %s\n', ME.message);

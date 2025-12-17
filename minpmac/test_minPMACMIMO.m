@@ -7,7 +7,7 @@ rng(42);
 
 %% reference tests
 
-fprintf('[reference] SISO\n');
+fprintf('[reference] siso\n');
 H_siso = zeros(1, 2, 4);
 H_siso(:, :, 1) = [80 60];
 H_siso(:, :, 2) = [40 30];
@@ -29,7 +29,7 @@ fprintf('  total energy: %.4f\n', total_energy);
 fprintf('  order: [%s]\n', num2str(info.orderings{1}));
 fprintf('\n');
 
-fprintf('[reference] MIMO\n');
+fprintf('[reference] mimo\n');
 Ly_ref = 2;
 Lx_ref = [2 2];
 N_ref = 2;
@@ -53,7 +53,7 @@ fprintf('\n');
 
 %% randomized and edge-case tests
 
-fprintf('[test] SISO\n');
+fprintf('[test] siso\n');
 Ly = 2;
 U = 3;
 N = 4;
@@ -65,7 +65,7 @@ cb = 1;
 
 run_test(@() minPMACMIMO(H_siso_rand, Lx, bu_min, w, cb), bu_min);
 
-fprintf('[test] MIMO\n');
+fprintf('[test] mimo\n');
 Ly = 3;
 Lx = [2, 3, 2];
 U = length(Lx);
@@ -77,7 +77,7 @@ w = [1, 2, 1];
 
 run_test(@() minPMACMIMO(H_mimo_rand, Lx, bu_min, w, cb), bu_min);
 
-fprintf('[test] Stress\n');
+fprintf('[test] stress\n');
 Ly = 4;
 Lx = [3, 2, 4, 2, 1, 2];
 U = length(Lx);
@@ -95,7 +95,7 @@ w = ones(1, U);
 
 run_test(@() minPMACMIMO(H_large, Lx, bu_min, w, cb), bu_min);
 
-fprintf('[test] Real baseband\n');
+fprintf('[test] real baseband\n');
 H_real = randn(2, 3, 4);
 Lx = ones(1, 3);
 bu_min = [1, 1, 1];
@@ -140,7 +140,7 @@ function run_test(solver, target_rates, expect_infeasible)
         if expect_infeasible
 
             if flag == 0
-                fprintf('  [✓] infeasible case detected\n');
+                fprintf('  [p] infeasible case detected\n');
             else
                 fprintf('  [x] infeasible case not detected\n');
             end
@@ -148,7 +148,7 @@ function run_test(solver, target_rates, expect_infeasible)
         else
 
             if flag > 0
-                fprintf('  [✓] test passed\n');
+                fprintf('  [p] test passed\n');
             else
                 fprintf('  [x] test failed (infeasible)\n');
             end
