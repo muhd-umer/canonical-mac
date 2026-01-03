@@ -1,44 +1,41 @@
-% function [Rxxs, Eun, w, bun] = maxRESMACMIMO_cvx(H, Lxu, Eu, theta , cb)
+% function [Rxxs, Eun, w, bun] = maxRMACMIMO_cvx(H, Lxu, Eu, theta , cb)
 %
 % maxRMAC_vector_cvx Maximize weighted rate sum subject to energy
 % constaint. This uses cvx and mosek.
 %
 %   INPUTS:
-% H(:,u,n): Ly x U x N channel matrix. Ly = number of receiver antennas,
+%     H(:,u,n): Ly x U x N channel matrix. Ly = number of receiver antennas,
 %     U = number of users and N = number of tones.
 %
 %     If the channel is real-bbd (cb=2), maxPMAC_cvx realizes user data rates
 %     over all the tones (or equivalently positive and negative
 %     freqs). This means the input H must be conjugate symmetric H_n =
 %     H_{N-n}^*.  The program will reduce N by 2 and focus energy on the
-%     lower half of frequencies. Thus N>1 must be even for real channels.
-%     For real N=1 channel, the program runs and will produce half the data
-%     rates for the same complex N=1 channel.
+%     lower half of frequencies. Thus N>1 must be even for real channels,
+%     with a special exception made for N=1.
 %
 %     By constast if cb=1 (cplx bbd), maxRMAC_cvx need not have a conjugate
 %     symmetric H and N is not reduced.
 %
-% Lxu 1 x U vector of user number of antennas
-%
-% Eu: TOTAL SUM-ENERGY/symbol constraint for all user inputs.
+% Eu: 1 x U Energy constraint for each user as total energy per symbol.
+%     For N=1 channel, the program adjusts energy to be per complex (cb=1)
+%     symbol at the beginning and then restores at end.  cb=2 has no
+%     change.  So for N=1, the input Eu should be u's energy/symbol.
 %
 % theta: weight on each user's rate, length-U vector.
 %
 % cb: =1 if H is complex baseband, and cb=2 if H is real baseband.
-%   Outputs:
+%
 %   OUTPUTS:
 % Rxxs:  U-by-N cell array containing Rxx(u,n)'s if Lxu is a length-U
 %        vector; or Lxu-by-Lxu-by-U-by-N tensor if Lxu is a scalar.
 % Eun:    U x N energy distribution. Eun(u,n) is user u's energy allocation
 %         on tone n.
-% w:   U x 1 Lagrangian multiplier w.r.t. energy constraints
+% w:      U x 1 Lagrangian multiplier w.r.t. energy constraints
+% bun:    U by N bit distributions for all users.
 % bun: U by N bit distributions for all users.
-%       - Rxxs:
-%       - Eun:  U-by-N matrix showing users' transmit energy on each tone
-%       - w: U-by-1 Lagrangian multiplier w.r.t. energy constraints
-%       - bun: U-by-N matrix showing users' rate on each tone
 % **********************************************************************
-function [Rxxs, Eun, w, bun] = maxRESMACMIMO_cvx(H, Lxu, Eu, theta, cb)
+function [Rxxs, Eun, w, bun] = maxRMACMIMO_cvx(H, Lxu, Eu, theta, cb)
 
     UNIFORM_FLAG = 0;
     [Ly, ~, N] = size(H);
@@ -50,15 +47,15 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO_cvx(H, Lxu, Eu, theta, cb)
             N = N / 2;
         end
 
-    end
-
-    if N == 1
+    else
+        Eu = Eu / (3 - cb);
         H = reshape(H, Ly, [], 1);
     end
 
     Eu = reshape(Eu, [], 1);
     theta = reshape(theta, [], 1);
     [stheta, idx] = sort(theta, 'descend');
+    Eu = Eu(idx);
     delta = -diff([stheta; 0]);
     U = length(Eu);
 
@@ -94,7 +91,7 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO_cvx(H, Lxu, Eu, theta, cb)
 
     maximize sum(delta' * r)
     subject to
-    w:sum(sum(Eun, 2)) <= Eu;
+    w:sum(Eun, 2) <= Eu;
 
     for u = 1:U
 
@@ -123,13 +120,18 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO_cvx(H, Lxu, Eu, theta, cb)
     bun(idx, :) = diff([zeros(1, N); cumrate]);
     w(idx) = w;
 
+    if N == 1
+        Eun = (3 - cb) * Eun;
+        rxxs = (3 - cb) * rxxs;
+    end
+
     if UNIFORM_FLAG
         Rxxs(:, :, idx, 1:N) = rxxs;
 
         for u = 1:U
 
             for n = 1:N
-                Eun(idx(u), n) = trace(Rxxs(:, :, u, n));
+                Eun(idx(u), n) = trace(Rxxs(:, :, idx(u), n));
             end
 
         end
