@@ -101,7 +101,8 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
         count = count + 1;
 
         if count > 2000 % arbitrary limit to prevent infinite loops
-            warning('Ellipsoid method did not converge');
+            warning('minPMACMIMO:ellipsoidNotConverged', ...
+                'ellipsoid method did not converge within %d iterations', count);
             break;
         end
 
