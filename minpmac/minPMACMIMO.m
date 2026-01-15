@@ -18,6 +18,9 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     %                   frac   time-sharing fractions for active decoding orders (empty if single order).
     %                   bun    per-tone bit allocations for the returned solution.
 
+    this_dir = fileparts(mfilename('fullpath'));
+    addpath(fullfile(this_dir, 'utils'));
+
     tic;
     [Ly, Ltot, N] = size(H);
     U = length(Lx);

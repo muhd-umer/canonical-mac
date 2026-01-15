@@ -19,6 +19,9 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO(H, Lxu, Etotal, theta, cb)
     %       w       U x 1 Lagrangian multiplier vector w.r.t. energy constraints.
     %       bun     U x N bit distribution matrix for all users.
 
+    this_dir = fileparts(mfilename('fullpath'));
+    addpath(fullfile(this_dir, 'utils'));
+
     [Ly, Ltot, N] = size(H);
 
     % handle real baseband symmetry

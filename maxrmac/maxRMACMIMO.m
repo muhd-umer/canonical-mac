@@ -4,9 +4,9 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
     %   weighted sum rate for a (noise-whitened) multi-user MIMO MAC subject to
     %   per-user total energy constraints.
     %
-    %   This is a non-CVX implementation that solves the Lagrangian dual in the
-    %   energy multipliers and evaluates the per-tone inner maximization via a
-    %   limited-memory quasi-Newton method over Cholesky-like factors.
+    %   This uses the ellipsoid method to optimize the Lagrange dual over energy
+    %   multipliers and L-BFGS to solve the per-tone inner maximization via
+    %   Cholesky-like factors.
     %
     %   Inputs:
     %       H       channel tensor [Ly, sum(Lxu), N] with user antennas stacked.
@@ -22,6 +22,9 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
     %       Eun     U-by-N energy allocation, Eun(u,n)=trace(Rxx(u,n)).
     %       w       U-by-1 dual variables for energy constraints.
     %       bun     U-by-N per-user per-tone rates (bits).
+
+    this_dir = fileparts(mfilename('fullpath'));
+    addpath(fullfile(this_dir, 'utils'));
 
     [Ly, Ltot, N_in] = size(H);
     theta = reshape(theta, [], 1);
@@ -52,23 +55,7 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
         error('sum(Lxu)=%d must equal size(H,2)=%d', sum(Lxu_vec), Ltot);
     end
 
-    % dual update parameters
-    max_dual_iter = 800;
-    tol_energy = 1e-6;
-    dual_step = 0.5;
-    dual_step_min = 0.01;
-    dual_step_max = 1.0;
-    dual_step_shrink = 0.5;
-    dual_step_grow = 1.1;
-    dual_step_shrink_tol = 0.02;
-    dual_step_grow_tol = 0.05;
-    dual_log_clip = 4;
-    w_min = 1e-14;
-    w_max = 1e14;
-    energy_zero_tol = 1e-14;
-    energy_abs_tol = 1e-12;
-    warn_tol_energy = 1e-3;
-
+    % handle real baseband and single tone scaling
     N = N_in;
     single_tone_flag = (N_in == 1);
     scale_single = (3 - cb);
@@ -87,141 +74,107 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
         N = 1;
     end
 
+    % compute antenna index mapping
     idx_end = cumsum(Lxu_vec);
     idx_start = [1, idx_end(1:end - 1) + 1];
 
-    [~, idx_sort] = sort(theta, 'descend');
-    stheta = theta(idx_sort);
-    delta = stheta - [stheta(2:end); 0];
+    %% ellipsoid method for dual optimization
+    err_tol = 1e-9;
+    max_iter = 2000;
 
-    Eu_sorted = Eu(idx_sort);
-    Lxu_sorted = Lxu_vec(idx_sort);
-    idx_start_sorted = idx_start(idx_sort);
-    idx_end_sorted = idx_end(idx_sort);
+    % initialize ellipsoid
+    [A, w] = init_ellipsoid(H, Eu, theta, Lxu_vec, idx_start, idx_end);
+    state_warm = cell(N, 1);
 
-    w_sorted = max(w_min, ones(U, 1));
-    w_sorted(Eu_sorted <= energy_zero_tol) = w_max;
+    iter = 0;
 
-    states = cell(N, 1);
-    Rxx_sorted = cell(U, N);
-    Eun_sorted = zeros(U, N);
+    while true
+        iter = iter + 1;
 
-    prev_err = Inf;
-    step = dual_step;
-    converged = false;
+        % evaluate Lagrangian at current w
+        [~, bun_nats, Eun_iter, Rxx_iter, state_warm] = eval_lagfunc(H, theta, w, Lxu_vec, idx_start, idx_end, state_warm);
 
-    last_Rxx = [];
-    last_Eun = [];
+        % compute subgradient: g = Eu - sum(Eun, 2)
+        g = Eu - sum(Eun_iter, 2);
 
-    % special case; single tone has fixed per-user energies
-    if N == 1 && all(Lxu_sorted == 1)
-        [Rxx_sorted, Eun_sorted, w_sorted] = solve_single_tone(H(:, :, 1), Eu_sorted, delta, idx_start_sorted, idx_end_sorted, Ly, U);
-        last_Rxx = Rxx_sorted;
-        last_Eun = Eun_sorted;
-        converged = true;
-    end
+        % check stopping criteria
+        gAg = g' * A * g;
 
-    for iter = 1:max_dual_iter
-
-        if converged
+        if sqrt(gAg) <= err_tol
             break;
         end
 
-        [Rxx_iter, Eun_iter, states] = eval_primal(H, Lxu_sorted, idx_start_sorted, idx_end_sorted, delta, w_sorted, states);
-
-        last_Rxx = Rxx_iter;
-        last_Eun = Eun_iter;
-
-        E_used = sum(Eun_iter, 2);
-        mismatch = E_used - Eu_sorted;
-        rel_err = mismatch ./ max(Eu_sorted, energy_zero_tol);
-        active = Eu_sorted > energy_zero_tol;
-
-        if any(active)
-            err = max(abs(rel_err(active)));
-        else
-            err = 0;
+        if iter > max_iter
+            break;
         end
 
-        ok = true;
+        % update ellipsoid
+        gt = g / sqrt(gAg);
+        w = w - 1 / (U + 1) * A * gt;
+        A = U ^ 2 / (U ^ 2 - 1) * (A - 2 / (U + 1) * A * gt * gt' * A);
+
+        % project w onto feasible set (w >= 0)
+        ind = find(w < 0);
+
+        while ~isempty(ind)
+            g_proj = zeros(U, 1);
+            g_proj(ind(1)) = -1;
+            gAg_proj = g_proj' * A * g_proj;
+            gt_proj = g_proj / sqrt(gAg_proj);
+            w = w - 1 / (U + 1) * A * gt_proj;
+            A = U ^ 2 / (U ^ 2 - 1) * (A - 2 / (U + 1) * A * gt_proj * gt_proj' * A);
+            ind = find(w < 0);
+        end
+
+    end
+
+    % final evaluation at converged w
+    [~, bun_nats, Eun, Rxx_cell, ~] = eval_lagfunc(H, theta, w, Lxu_vec, idx_start, idx_end, state_warm);
+
+    % scale covariances to exactly satisfy energy constraints
+    E_used = sum(Eun, 2);
+
+    for u = 1:U
+
+        if E_used(u) > 1e-12
+            % normal case: scale existing allocation
+            scale_u = Eu(u) / E_used(u);
+
+            for n = 1:N
+                Rxx_cell{u, n} = scale_u * Rxx_cell{u, n};
+                Eun(u, n) = scale_u * Eun(u, n);
+            end
+
+        elseif Eu(u) > 1e-12
+            % edge case: user has no allocated energy but should have some
+            % allocate energy uniformly across tones with identity covariance shape
+            Lu = Lxu_vec(u);
+            energy_per_tone = Eu(u) / N / Lu; % energy per antenna per tone
+
+            for n = 1:N
+                Rxx_cell{u, n} = energy_per_tone * eye(Lu);
+                Eun(u, n) = Eu(u) / N;
+            end
+
+        end
+
+    end
+
+    % recompute rates with scaled covariances (using theta-sorted decoding order)
+    bun_nats = compute_rates(H, Rxx_cell, theta, Lxu_vec, idx_start, idx_end, Ly, U, N);
+
+    % convert rates from nats to bits and apply baseband scaling
+    bun = bun_nats / (log(2) * cb);
+
+    % match CVX convention for N==1 energy/covariance scaling
+    if single_tone_flag
+        Eun = scale_single * Eun;
 
         for u = 1:U
-
-            if Eu_sorted(u) <= energy_zero_tol
-                ok = ok && (abs(E_used(u)) <= energy_abs_tol);
-            else
-                active_ok = abs(mismatch(u)) / max(Eu_sorted(u), 1e-12) <= tol_energy;
-                inactive_ok = (w_sorted(u) <= w_min * 10) && (mismatch(u) < 0);
-                ok = ok && (active_ok || inactive_ok);
-            end
-
-        end
-
-        if ok
-            converged = true;
-            break;
-        end
-
-        if isfinite(prev_err)
-
-            if err > prev_err * (1 + dual_step_shrink_tol)
-                step = max(dual_step_min, step * dual_step_shrink);
-            elseif err < prev_err * (1 - dual_step_grow_tol)
-                step = min(dual_step_max, step * dual_step_grow);
-            end
-
-        end
-
-        prev_err = err;
-
-        ratio = max(E_used, energy_abs_tol) ./ max(Eu_sorted, energy_abs_tol);
-        log_ratio = log(ratio);
-        log_ratio = max(-dual_log_clip, min(dual_log_clip, log_ratio));
-        w_new = w_sorted .* exp(step * log_ratio);
-        w_new(Eu_sorted <= energy_zero_tol) = w_max;
-        w_sorted = min(w_max, max(w_min, w_new));
-    end
-
-    % ensure returned primal corresponds to final w
-    if converged
-        Rxx_sorted = last_Rxx;
-        Eun_sorted = last_Eun;
-    else
-        [Rxx_sorted, Eun_sorted, states] = eval_primal(H, Lxu_sorted, idx_start_sorted, idx_end_sorted, delta, w_sorted, states);
-    end
-
-    if ~converged && max_dual_iter > 0
-        E_used_final = sum(Eun_sorted, 2);
-        mismatch_final = E_used_final - Eu_sorted;
-        rel_err_final = mismatch_final ./ max(Eu_sorted, energy_zero_tol);
-        active = Eu_sorted > energy_zero_tol;
-
-        if any(active)
-            err_final = max(abs(rel_err_final(active)));
-        else
-            err_final = 0;
-        end
-
-        if err_final > warn_tol_energy
-            warning('maxRMACMIMO:dualNotConverged', ...
-                'dual update did not converge within %d iterations (max rel energy error %.2e)', ...
-                max_dual_iter, err_final);
+            Rxx_cell{u, 1} = scale_single * Rxx_cell{u, 1};
         end
 
     end
-
-    % compute final rates in the sorted order
-    bun_sorted = compute_rates(H, Rxx_sorted, Lxu_sorted, idx_start_sorted, idx_end_sorted, cb, U, N, Ly);
-
-    % map outputs back to original user order
-    w = zeros(U, 1);
-    w(idx_sort) = w_sorted;
-
-    Eun = zeros(U, N);
-    Eun(idx_sort, :) = Eun_sorted;
-
-    bun = zeros(U, N);
-    bun(idx_sort, :) = bun_sorted;
 
     % assemble covariance outputs
     Lxu_max = max(Lxu_vec);
@@ -229,116 +182,47 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
     if uniform_flag
         Rxxs = zeros(Lxu_max, Lxu_max, U, N);
 
-        for us = 1:U
-            u = idx_sort(us);
-            Lu = Lxu_sorted(us);
+        for u = 1:U
 
             for n = 1:N
-                Rxxs(1:Lu, 1:Lu, u, n) = Rxx_sorted{us, n};
+                Rxxs(1:Lxu_vec(u), 1:Lxu_vec(u), u, n) = Rxx_cell{u, n};
             end
 
         end
 
     else
-        Rxxs = cell(U, N);
-
-        for us = 1:U
-            u = idx_sort(us);
-
-            for n = 1:N
-                Rxxs{u, n} = Rxx_sorted{us, n};
-            end
-
-        end
-
-    end
-
-    % match CVX convention for N==1 energy scaling
-    if single_tone_flag
-        Eun = scale_single * Eun;
-
-        if uniform_flag
-            Rxxs(:, :, :, 1) = scale_single * Rxxs(:, :, :, 1);
-        else
-
-            for u = 1:U
-                Rxxs{u, 1} = scale_single * Rxxs{u, 1};
-            end
-
-        end
-
+        Rxxs = Rxx_cell;
     end
 
 end
 
-function [Rxx_sorted, Eun_sorted, w_sorted] = solve_single_tone(Hn, Eu_sorted, delta, idx_start, idx_end, Ly, U)
-    % SOLVE_SINGLE_TONE Single tone SISO/SIMO case with fixed per-user energies
+function bun = compute_rates(H, Rxx_cell, theta, Lxu, idx_start, idx_end, Ly, U, N)
+    %COMPUTE_RATES Compute per-user per-tone rates in nats
+    %   Uses decoding order sorted by decreasing theta.
 
-    Rxx_sorted = cell(U, 1);
-    Eun_sorted = zeros(U, 1);
-
-    for u = 1:U
-        Rxx_sorted{u, 1} = Eu_sorted(u);
-        Eun_sorted(u, 1) = Eu_sorted(u);
-    end
-
-    % compute KKT multipliers w from gradient of objective at this primal point
-    invS = cell(U, 1);
-    S = eye(Ly);
-
-    for u = 1:U
-        cols = idx_start(u):idx_end(u);
-        Hu = Hn(:, cols);
-        S = S + Hu * Eu_sorted(u) * Hu';
-        S = 0.5 * (S + S');
-        [L, flag] = chol(S, 'lower');
-
-        if flag ~= 0
-            [L, flag] = chol(S +1e-12 * eye(Ly), 'lower');
-        end
-
-        if flag ~= 0
-            error('failed to factorize covariance matrix in single tone solver');
-        end
-
-        Linv = L \ eye(Ly);
-        invS{u} = Linv' * Linv;
-    end
-
-    w_sorted = zeros(U, 1);
-    tail = zeros(Ly, Ly);
-
-    for u = U:-1:1
-        tail = tail + delta(u) * invS{u};
-        cols = idx_start(u):idx_end(u);
-        Hu = Hn(:, cols);
-        w_sorted(u) = real(Hu' * tail * Hu);
-    end
-
-end
-
-function bun = compute_rates(H, Rxx_all, Lxu, idx_start, idx_end, cb, U, N, Ly)
-    %COMPUTE_RATES Compute per-user per-tone rates from covariance matrices
+    % sort users by decreasing theta
+    [~, order] = sort(theta, 'descend');
 
     bun = zeros(U, N);
     eye_Ly = eye(Ly);
-    inv_log2_cb = 1 / (log(2) * cb);
 
     for n = 1:N
         Hn = H(:, :, n);
         S_prev = eye_Ly;
         logdet_prev = 0;
 
-        for u = 1:U
+        for pos = 1:U
+            u = order(pos);
             cols = idx_start(u):idx_end(u);
             Hu = Hn(:, cols);
-            HRH = Hu * Rxx_all{u, n} * Hu';
+            Ru = Rxx_cell{u, n};
+            HRH = Hu * Ru * Hu';
             HRH = 0.5 * (HRH + HRH');
             S_curr = S_prev + HRH;
             S_curr = 0.5 * (S_curr + S_curr');
 
-            logdet_curr = logdet_stable(S_curr);
-            bun(u, n) = (logdet_curr - logdet_prev) * inv_log2_cb;
+            logdet_curr = logdet(S_curr);
+            bun(u, n) = logdet_curr - logdet_prev;
             S_prev = S_curr;
             logdet_prev = logdet_curr;
         end
@@ -347,8 +231,8 @@ function bun = compute_rates(H, Rxx_all, Lxu, idx_start, idx_end, cb, U, N, Ly)
 
 end
 
-function val = logdet_stable(M)
-    %LOGDET_STABLE Numerically stable log-determinant computation
+function val = logdet(M)
+    %LOGDET Numerically stable log-determinant
 
     M = 0.5 * (M + M');
     [L, flag] = chol(M, 'lower');
@@ -366,4 +250,5 @@ function val = logdet_stable(M)
     end
 
     val = 2 * sum(log(diag(L)));
+
 end
