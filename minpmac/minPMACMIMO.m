@@ -142,7 +142,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
 
     else
         % multiple orders; solve for time-sharing weights
-        [weights, bu_vertices, bun_orders, orderings] = solve_time_sharing(H, ...
+        [weights, bu_vertices, bun_orders, orderings] = time_sharing(H, ...
             Rxx_opt, all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end);
 
         if isempty(weights)
@@ -279,8 +279,19 @@ function [bu_achieved, b_achieved] = compute_rates(H, Rxx, order, ...
     bu_achieved = sum(b_achieved, 2);
 end
 
-function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing(H, ...
-        Rxx, orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end)
+function [weights, bu_vertices, bun_vertices, orderings] = time_sharing(H, ...
+        Rxx, orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end, use_cvx)
+    %TIME_SHARING Find time-sharing weights for multiple decoding orders
+    %   Computes rates for all decoding orders and finds convex weights
+    %   such that the weighted combination meets target rates.
+    %
+    %   When use_cvx=true (default=false), uses CVX with MOSEK for a MILP.
+    %   When use_cvx=false, uses MATLAB's linprog for a simple LP.
+
+    if nargin < 12
+        use_cvx = false; % default to non-CVX implementation
+    end
+
     num_orders = size(orders, 1);
     bu_vertices = zeros(U, num_orders);
     orderings = cell(num_orders, 1);
@@ -295,23 +306,38 @@ function [weights, bu_vertices, bun_vertices, orderings] = solve_time_sharing(H,
     end
 
     tol = 1e-3;
-    cvx_begin quiet
-    cvx_solver mosek
-    variable weights(num_orders) nonnegative
-    variable z(num_orders) binary
-    minimize(sum(z))
-    subject to
-    sum(weights) == 1;
-    bu_vertices * weights >= bu_min - tol;
-    weights <= z;
-    cvx_end
 
-    if ~strcmp(cvx_status, 'Solved') && ~strcmp(cvx_status, 'Inaccurate/Solved')
-        weights = [];
+    if use_cvx
+        cvx_begin quiet
+        cvx_solver mosek
+        variable weights(num_orders) nonnegative
+        variable z(num_orders) binary
+        minimize(sum(z))
+        subject to
+        sum(weights) == 1;
+        bu_vertices * weights >= bu_min - tol;
+        weights <= z;
+        cvx_end
+
+        if ~strcmp(cvx_status, 'Solved') && ~strcmp(cvx_status, 'Inaccurate/Solved')
+            weights = [];
+            return;
+        end
+
+        active_idx = weights > 1e-8;
+    else
+        [weights, active_idx] = solve_time_sharing(bu_vertices, bu_min, tol);
+
+        if isempty(weights)
+            return;
+        end
+
+        bu_vertices = bu_vertices(:, active_idx);
+        bun_vertices = bun_vertices(active_idx);
+        orderings = orderings(active_idx);
         return;
     end
 
-    active_idx = weights > 1e-8;
     weights = weights(active_idx);
     weights = weights / sum(weights);
     bu_vertices = bu_vertices(:, active_idx);
