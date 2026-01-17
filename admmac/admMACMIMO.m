@@ -518,7 +518,6 @@ function [FEAS_FLAG, Big_info, bu_a] = process_clusters(H, Lxu, Rxxs, bu_v, bun,
                 a_v = find(frac >= err);
                 info_rows = known_vertices(a_v, :);
                 info_rows.frac = frac(a_v);
-                info_rows.frac = info_rows.frac / sum(info_rows.frac);
                 info_rows.clusterID = ones(length(a_v), 1) * jdx;
                 bu_a(u_range) = bd_vertices(a_v, :)' * info_rows.frac;
 

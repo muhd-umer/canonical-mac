@@ -319,7 +319,6 @@ function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMAC_cvx(H, Lxu, bu, E
                     a_v = find(frac >= err); % active vertices in time-share
                     info = known_vertices(a_v, :);
                     info.frac = frac(a_v);
-                    info.frac = info.frac / sum(info.frac);
                     info.clusterID = ones(length(a_v), 1) * jdx;
                     bu_a(u_range) = bd_vertices(a_v, :)' * info.frac;
                     break;
