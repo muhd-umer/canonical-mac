@@ -38,6 +38,24 @@ if(NOT Eigen3_FOUND)
     endif()
 endif()
 
+if(APPLE)
+    execute_process(
+        COMMAND brew --prefix libomp
+        OUTPUT_VARIABLE HOMEBREW_LIBOMP_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    
+    if(HOMEBREW_LIBOMP_PREFIX)
+        message(STATUS "Found Homebrew libomp: ${HOMEBREW_LIBOMP_PREFIX}")
+        set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I${HOMEBREW_LIBOMP_PREFIX}/include")
+        set(OpenMP_CXX_LIB_NAMES "omp")
+        set(OpenMP_omp_LIBRARY "${HOMEBREW_LIBOMP_PREFIX}/lib/libomp.dylib")
+    else()
+        message(WARNING "Homebrew libomp not found. Install with: brew install libomp")
+    endif()
+endif()
+
 find_package(OpenMP REQUIRED)
 
 add_library(maxrmac_lib STATIC
@@ -75,24 +93,54 @@ install(FILES
     DESTINATION include/maxrmac
 )
 
-find_package(Matlab QUIET COMPONENTS MX_LIBRARY)
+find_package(Matlab QUIET COMPONENTS MX_LIBRARY MEX_COMPILER)
 
 if(Matlab_FOUND)
     message(STATUS "MATLAB found: ${Matlab_ROOT_DIR}")
     message(STATUS "  Building MEX interface")
 
-    matlab_add_mex(
-        NAME maxrmac_mex
-        SRC maxrmac_mex.cpp
-        LINK_TO maxrmac_lib
-        R2018a
+    if(APPLE)
+        if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+            set(MEX_EXT "mexmaca64")
+        else()
+            set(MEX_EXT "mexmaci64")
+        endif()
+    elseif(UNIX)
+        set(MEX_EXT "mexa64")
+    elseif(WIN32)
+        set(MEX_EXT "mexw64")
+    endif()
+
+    add_library(maxrmac_mex MODULE maxrmac_mex.cpp)
+
+    target_include_directories(maxrmac_mex PRIVATE
+        ${Matlab_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(maxrmac_mex PRIVATE
+        maxrmac_lib
+        ${Matlab_MX_LIBRARY}
+        ${Matlab_MEX_LIBRARY}
+    )
+
+    target_compile_definitions(maxrmac_mex PRIVATE
+        MATLAB_MEX_FILE
+        MATLAB_DEFAULT_RELEASE=R2018a
     )
 
     set_target_properties(maxrmac_mex PROPERTIES
+        PREFIX ""
+        SUFFIX ".${MEX_EXT}"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../"
     )
 
-    target_link_options(maxrmac_mex PRIVATE -static-libgcc -static-libstdc++)
+    if(APPLE)
+        set_target_properties(maxrmac_mex PROPERTIES
+            LINK_FLAGS "-undefined dynamic_lookup -flat_namespace"
+        )
+    else()
+        target_link_options(maxrmac_mex PRIVATE -static-libgcc -static-libstdc++)
+    endif()
 else()
     message(STATUS "MATLAB not found; skipping MEX build")
     message(STATUS "  To build MEX, set Matlab_ROOT_DIR or use mex command directly")

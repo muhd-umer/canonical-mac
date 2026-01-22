@@ -90,7 +90,7 @@ if cpp_available
     cpp_results = run_all_tests(@maxRMACMIMOcpp, tests);
 
     %% comparison table
-    fprintf('[comparison]\n\n');
+    fprintf('[comparison]\n');
 
     fprintf('%-18s | %10s %10s | %10s %10s | %8s %8s | %7s\n', ...
         'test', 'rate[.m]', 'rate[.cpp]', 'energy[.m]', 'energy[.cpp]', 'ms[.m]', 'ms[.cpp]', 'speedup');

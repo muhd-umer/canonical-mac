@@ -1,8 +1,11 @@
-function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
+function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb, use_mex)
     %MAXRMACMIMO Maximize weighted rate sum with per-user energy constraints
     %   [Rxxs, Eun, w, bun] = MAXRMACMIMO(H, Lxu, Eu, theta, cb) maximizes the
     %   weighted sum rate for a (noise-whitened) multi-user MIMO MAC subject to
     %   per-user total energy constraints.
+    %
+    %   [Rxxs, Eun, w, bun] = MAXRMACMIMO(..., use_mex) uses the C++ MEX
+    %   implementation when use_mex is true. Default is true..
     %
     %   This uses the ellipsoid method to optimize the Lagrange dual over energy
     %   multipliers and L-BFGS to solve the per-tone inner maximization via
@@ -15,6 +18,7 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
     %       Eu      per-user energy constraints (length-U vector).
     %       theta   per-user rate weights (length-U vector).
     %       cb      baseband type: 1 for complex, 2 for real.
+    %       use_mex (optional) use C++ MEX implementation (default: true).
     %
     %   Outputs:
     %       Rxxs    U-by-N cell array of covariance matrices, or
@@ -22,6 +26,73 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb)
     %       Eun     U-by-N energy allocation, Eun(u,n)=trace(Rxx(u,n)).
     %       w       U-by-1 dual variables for energy constraints.
     %       bun     U-by-N per-user per-tone rates (bits).
+
+    if nargin < 6
+        use_mex = true;
+    end
+
+    if use_mex
+
+        if exist('maxrmac_mex', 'file') ~= 3
+            error('maxRMACMIMO:mexNotFound', ...
+            'MEX file ''maxrmac_mex'' not found. Compile it first or set use_mex=false.');
+        end
+
+        [Ly, Ltot, ~] = size(H);
+        theta = reshape(theta, [], 1);
+        Eu = reshape(Eu, [], 1);
+        U = length(theta);
+
+        if length(Eu) ~= U
+            error('Eu must have length U=%d', U);
+        end
+
+        if cb ~= 1 && cb ~= 2
+            error('cb must be 1 (complex) or 2 (real)');
+        end
+
+        if isscalar(Lxu)
+            Lxu_vec = ones(1, U) * Lxu;
+            uniform_flag = true;
+        else
+            Lxu_vec = reshape(Lxu, 1, []);
+            uniform_flag = false;
+        end
+
+        if length(Lxu_vec) ~= U
+            error('Lxu must be a scalar or a length-U vector');
+        end
+
+        if sum(Lxu_vec) ~= Ltot
+            error('sum(Lxu)=%d must equal size(H,2)=%d', sum(Lxu_vec), Ltot);
+        end
+
+        if isreal(H)
+            H = complex(H);
+        end
+
+        [Rxx_cell, Eun, w, bun] = maxrmac_mex(H, Lxu_vec, Eu, theta, cb);
+
+        N = size(bun, 2);
+        Lxu_max = max(Lxu_vec);
+
+        if uniform_flag
+            Rxxs = zeros(Lxu_max, Lxu_max, U, N);
+
+            for u = 1:U
+
+                for n = 1:N
+                    Rxxs(1:Lxu_vec(u), 1:Lxu_vec(u), u, n) = Rxx_cell{u, n};
+                end
+
+            end
+
+        else
+            Rxxs = Rxx_cell;
+        end
+
+        return;
+    end
 
     this_dir = fileparts(mfilename('fullpath'));
     addpath(fullfile(this_dir, 'utils'));
