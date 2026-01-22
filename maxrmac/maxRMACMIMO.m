@@ -91,6 +91,8 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb, use_mex)
             Rxxs = Rxx_cell;
         end
 
+        Rxxs = cellfun(@real, Rxxs);
+
         return;
     end
 
