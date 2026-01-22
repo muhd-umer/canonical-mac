@@ -11,6 +11,8 @@ tex/
 CLAUDE.local.md
 .DS_Store
 .vscode/
+**.mexa64
+**.mexmaca64
 
 # C extensions
 *.so
