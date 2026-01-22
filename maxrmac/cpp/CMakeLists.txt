@@ -54,6 +54,8 @@ target_link_libraries(maxrmac_lib PUBLIC
     OpenMP::OpenMP_CXX
 )
 
+set_target_properties(maxrmac_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(maxrmac_lib PRIVATE -fsanitize=address -g)
     target_link_options(maxrmac_lib PRIVATE -fsanitize=address)
@@ -73,3 +75,25 @@ install(FILES
     DESTINATION include/maxrmac
 )
 
+find_package(Matlab QUIET COMPONENTS MX_LIBRARY)
+
+if(Matlab_FOUND)
+    message(STATUS "MATLAB found: ${Matlab_ROOT_DIR}")
+    message(STATUS "  Building MEX interface")
+
+    matlab_add_mex(
+        NAME maxrmac_mex
+        SRC maxrmac_mex.cpp
+        LINK_TO maxrmac_lib
+        R2018a
+    )
+
+    set_target_properties(maxrmac_mex PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../"
+    )
+
+    target_link_options(maxrmac_mex PRIVATE -static-libgcc -static-libstdc++)
+else()
+    message(STATUS "MATLAB not found; skipping MEX build")
+    message(STATUS "  To build MEX, set Matlab_ROOT_DIR or use mex command directly")
+endif()

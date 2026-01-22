@@ -223,11 +223,9 @@ ToneResult solve_tone(const MatrixXcd& Hn, const VectorXd& theta,
     }
 
     LBFGSConfig cfg;
-    cfg.max_iter = 100;
-
-    cfg.m_hist = 8;
-
-    cfg.tol_grad = 1e-5;
+    cfg.max_iter = 200;
+    cfg.m_hist = 12;
+    cfg.tol_grad = 1e-6;
 
     pack_blocks(ws.B_blocks, sLxu, ws.x);
 
