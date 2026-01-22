@@ -81,13 +81,13 @@ tests(10).theta = [1; 2; 1.5; 0.5; 1.2; 0.8]; tests(10).cb = 1;
 %% run MATLAB tests
 fprintf('[matlab]\n\n');
 
-matlab_results = run_all_tests(@maxRMACMIMO, tests);
+matlab_results = run_all_tests(@(H, Lxu, Eu, theta, cb) maxRMACMIMO(H, Lxu, Eu, theta, cb, false), tests);
 
 %% run C++ tests
 if cpp_available
     fprintf('[cpp]\n\n');
 
-    cpp_results = run_all_tests(@maxRMACMIMOcpp, tests);
+    cpp_results = run_all_tests(@(H, Lxu, Eu, theta, cb) maxRMACMIMO(H, Lxu, Eu, theta, cb, true), tests);
 
     %% comparison table
     fprintf('[comparison]\n');
