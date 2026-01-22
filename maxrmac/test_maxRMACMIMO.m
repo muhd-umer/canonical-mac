@@ -121,8 +121,6 @@ function results = run_all_tests(solver, tests)
         fprintf('\n');
     end
 
-    passed = sum([results.passed]);
-    fprintf('[summary] %d/%d tests passed\n\n', passed, length(tests));
 end
 
 function result = run_test(solver, H, Lxu, Eu, theta, cb, test_name)
