@@ -131,7 +131,7 @@ TestResult validate_result(const MinPMACResult& result, const VectorXd& bu_min,
         }
     }
 
-    std::cout << "  elapsed: " << std::fixed << std::setprecision(3)
+    std::cout << "  elapsed time: " << std::fixed << std::setprecision(3)
               << result.elapsed_sec * 1000 << " ms" << std::endl;
 
     const double rate_tol = 1e-2;
@@ -435,8 +435,6 @@ TestResult test_low_rate() {
 int main(int argc, char* argv[]) {
     std::vector<TestResult> results;
 
-    std::cout << "=== minPMACMIMO C++ Test Suite ===" << std::endl << std::endl;
-
     results.push_back(run_test("reference siso", test_reference_siso));
     std::cout << std::endl;
 
@@ -469,22 +467,17 @@ int main(int argc, char* argv[]) {
             ++failed;
     }
 
-    std::cout << "=== Summary ===" << std::endl;
+    std::cout << std::endl;
     std::cout << "[passed] " << passed << "/" << results.size() << std::endl;
     std::cout << "[failed] " << failed << "/" << results.size() << std::endl;
     std::cout << std::endl;
 
-    std::cout << "[timing]" << std::endl;
-    double total_time = 0.0;
+    std::cout << "[summary]" << std::endl;
     for (const auto& r : results) {
         std::cout << "  " << std::left << std::setw(25) << r.name << ": "
                   << std::fixed << std::setprecision(3) << r.elapsed_ms << " ms"
                   << std::endl;
-        total_time += r.elapsed_ms;
     }
-    std::cout << "  " << std::left << std::setw(25) << "TOTAL"
-              << ": " << std::fixed << std::setprecision(3) << total_time
-              << " ms" << std::endl;
 
     return failed > 0 ? 1 : 0;
 }
