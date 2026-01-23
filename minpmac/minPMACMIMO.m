@@ -1,4 +1,4 @@
-function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex)
+function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, use_cvx)
     %MINPMACMIMO Minimum power multi-user MIMO MAC (non-CVX implementation)
     %   [FEAS_FLAG, bu_a, info] = MINPMACMIMO(H, Lx, bu_min, w, cb) computes the
     %   optimal covariance matrices that satisfy user rate targets with minimum
@@ -14,6 +14,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex)
     %       w       positive energy weights [1, U].
     %       cb      baseband type: 1 for complex, 2 for real (affects rate scaling).
     %       use_mex (optional) use C++ MEX implementation (default: true).
+
     %
     %   Outputs:
     %       FEAS_FLAG   feasibility flag: 0 infeasible, 1 single order, 2 time-sharing.
@@ -24,6 +25,10 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex)
 
     if nargin < 6
         use_mex = true;
+    end
+
+    if nargin < 7
+        use_cvx = true;
     end
 
     if use_mex
@@ -358,11 +363,11 @@ function [weights, bu_vertices, bun_vertices, orderings] = time_sharing(H, ...
     %   Computes rates for all decoding orders and finds convex weights
     %   such that the weighted combination meets target rates.
     %
-    %   When use_cvx=true (default=false), uses CVX with MOSEK for a MILP.
-    %   When use_cvx=false, uses MATLAB's linprog for a simple LP.
+    %   When use_cvx=true, uses CVX with MOSEK for a MILP.
+    %   When use_cvx=false (default=true), uses MATLAB's linprog for a simple LP.
 
     if nargin < 12
-        use_cvx = false; % default to non-CVX implementation
+        use_cvx = true; % default to CVX implementation
     end
 
     num_orders = size(orders, 1);
