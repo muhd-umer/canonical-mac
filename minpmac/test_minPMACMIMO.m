@@ -2,162 +2,173 @@
 
 clear;
 clc;
-cvx_clear;
 rng(42);
 
-%% reference tests
+cpp_available = exist('minpmac_mex', 'file') == 3;
 
-fprintf('[reference] siso\n');
-H_siso = zeros(1, 2, 4);
-H_siso(:, :, 1) = [80 60];
-H_siso(:, :, 2) = [40 30];
-H_siso(:, :, 3) = [50 50];
-H_siso(:, :, 4) = [30 40];
-Lx_siso = [1 1];
-bu_ref_siso = [24 24];
-w_ref = [1 1];
-cb = 1;
-
-[flag, bu_a, info] = minPMACMIMO(H_siso, Lx_siso, bu_ref_siso, w_ref, cb);
-total_energy = sum(info.Rxx{1}, 'all');
-
-fprintf('  users: %d, tones: %d, rx: %d\n', length(Lx_siso), size(H_siso, 3), size(H_siso, 1));
-fprintf('  target rates: [%s]\n', num2str(bu_ref_siso));
-fprintf('  achieved rates: [%s]\n', num2str(bu_a));
-fprintf('  feasibility flag: %d\n', flag);
-fprintf('  total energy: %.4f\n', total_energy);
-fprintf('  order: [%s]\n', num2str(info.orderings{1}));
-fprintf('\n');
-
-fprintf('[reference] mimo\n');
-Ly_ref = 2;
-Lx_ref = [2 2];
-N_ref = 2;
-H_mimo = zeros(Ly_ref, sum(Lx_ref), N_ref);
-H_mimo(:, 1:2, 1) = [3.2 2.1; 1.8 2.9];
-H_mimo(:, 3:4, 1) = [2.5 3.0; 2.2 1.9];
-H_mimo(:, 1:2, 2) = [2.9 2.5; 2.0 3.1];
-H_mimo(:, 3:4, 2) = [2.8 2.3; 1.7 2.6];
-bu_ref_mimo = [10 10];
-w_ref_mimo = [1 1];
-
-[flag, bu_a, info] = minPMACMIMO(H_mimo, Lx_ref, bu_ref_mimo, w_ref_mimo, cb);
-
-fprintf('  users: %d, tones: %d, rx: %d\n', length(Lx_ref), N_ref, Ly_ref);
-fprintf('  target rates: [%s]\n', num2str(bu_ref_mimo));
-fprintf('  achieved rates: [%s]\n', num2str(bu_a));
-fprintf('  feasibility flag: %d\n', flag);
-fprintf('  total energy: %.4f\n', sum(info.Rxx{1}, 'all'));
-fprintf('  order: [%s]\n', num2str(info.orderings{1}));
-fprintf('\n');
-
-%% randomized and edge-case tests
-
-fprintf('[test] siso\n');
-Ly = 2;
-U = 3;
-N = 4;
-H_siso_rand = (randn(Ly, U, N) + 1j * randn(Ly, U, N)) / sqrt(2);
-Lx = ones(1, U);
-bu_min = [2, 1.5, 2.5];
-w = [1, 1, 1];
-cb = 1;
-
-run_test(@() minPMACMIMO(H_siso_rand, Lx, bu_min, w, cb), bu_min);
-
-fprintf('[test] mimo\n');
-Ly = 3;
-Lx = [2, 3, 2];
-U = length(Lx);
-Ltot = sum(Lx);
-N = 6;
-H_mimo_rand = (randn(Ly, Ltot, N) + 1j * randn(Ly, Ltot, N)) / sqrt(2);
-bu_min = [3, 4, 2.5];
-w = [1, 2, 1];
-
-run_test(@() minPMACMIMO(H_mimo_rand, Lx, bu_min, w, cb), bu_min);
-
-fprintf('[test] stress\n');
-Ly = 4;
-Lx = [3, 2, 4, 2, 1, 2];
-U = length(Lx);
-Ltot = sum(Lx);
-N = 64;
-H_large = zeros(Ly, Ltot, N);
-
-for n = 1:N
-    H_base = (randn(Ly, Ltot) + 1j * randn(Ly, Ltot)) / sqrt(2);
-    H_large(:, :, n) = H_base + 0.1 * eye(Ly, Ltot);
+if cpp_available
+    fprintf('[info] MEX implementation available\n\n');
+else
+    fprintf('[info] MEX not found; testing MATLAB only\n');
+    fprintf('[info] Build with: cd build && cmake .. && make minpmac_mex\n\n');
 end
 
-bu_min = [2, 1.8, 2.2, 1.5, 2, 1.8];
-w = ones(1, U);
+%% test definitions
+tests = struct();
 
-run_test(@() minPMACMIMO(H_large, Lx, bu_min, w, cb), bu_min);
+tests(1).name = 'reference siso';
+H = zeros(1, 2, 4);
+H(:, :, 1) = [80 60]; H(:, :, 2) = [40 30];
+H(:, :, 3) = [50 50]; H(:, :, 4) = [30 40];
+tests(1).H = H; tests(1).Lx = [1 1]; tests(1).bu_min = [24 24];
+tests(1).w = [1 1]; tests(1).cb = 1;
 
-fprintf('[test] real baseband\n');
-H_real = randn(2, 3, 4);
-Lx = ones(1, 3);
-bu_min = [1, 1, 1];
-w = [1, 1, 1];
-cb = 2;
+tests(2).name = 'reference mimo';
+H = zeros(2, 4, 2);
+H(:, 1:2, 1) = [3.2 2.1; 1.8 2.9]; H(:, 3:4, 1) = [2.5 3.0; 2.2 1.9];
+H(:, 1:2, 2) = [2.9 2.5; 2.0 3.1]; H(:, 3:4, 2) = [2.8 2.3; 1.7 2.6];
+tests(2).H = H; tests(2).Lx = [2 2]; tests(2).bu_min = [10 10];
+tests(2).w = [1 1]; tests(2).cb = 1;
 
-run_test(@() minPMACMIMO(H_real, Lx, bu_min, w, cb), bu_min);
+tests(3).name = 'unequal weights';
+H = zeros(1, 2, 4);
+H(:, :, 1) = [80 60]; H(:, :, 2) = [40 30];
+H(:, :, 3) = [50 50]; H(:, :, 4) = [30 40];
+tests(3).H = H; tests(3).Lx = [1 1]; tests(3).bu_min = [20 20];
+tests(3).w = [1 2]; tests(3).cb = 1;
 
-%% helper functions
+tests(4).name = 'three users';
+H = zeros(2, 3, 4);
+H(:, :, 1) = [5 4 3; 4 5 4]; H(:, :, 2) = [4 3 5; 3 4 5];
+H(:, :, 3) = [3 5 4; 5 3 4]; H(:, :, 4) = [4 4 4; 4 4 4];
+tests(4).H = H; tests(4).Lx = [1 1 1]; tests(4).bu_min = [3 4 3.5];
+tests(4).w = [1 1 1]; tests(4).cb = 1;
 
-function run_test(solver, target_rates, expect_infeasible)
+tests(5).name = 'mimo unequal ant';
+tests(5).H = (randn(3, 5, 2) + 1j * randn(3, 5, 2)) / sqrt(2);
+tests(5).Lx = [2 3]; tests(5).bu_min = [4 6];
+tests(5).w = [1 1.5]; tests(5).cb = 1;
 
-    if nargin < 3
-        expect_infeasible = false;
-    end
+tests(6).name = 'real baseband';
+H = zeros(1, 2, 4);
+H(:, :, 1) = [5 4]; H(:, :, 2) = [3 2];
+H(:, :, 3) = [2 3]; H(:, :, 4) = [4 5];
+tests(6).H = H; tests(6).Lx = [1 1]; tests(6).bu_min = [2 2];
+tests(6).w = [1 1]; tests(6).cb = 2;
 
-    try
-        tic;
-        [flag, bu_a, info] = solver();
-        elapsed = toc;
+tests(7).name = 'uniform Lx';
+tests(7).H = (randn(2, 6, 3) + 1j * randn(2, 6, 3)) / sqrt(2);
+tests(7).Lx = 2; tests(7).bu_min = [3 4 5];
+tests(7).w = [1 1 1]; tests(7).cb = 1;
 
-        if isfield(info, 'clusters')
-            num_clusters = length(info.clusters);
-        else
-            num_clusters = 0;
-        end
+tests(8).name = 'stress';
+tests(8).H = (randn(4, 9, 64) + 1j * randn(4, 9, 64)) / sqrt(2);
+tests(8).Lx = [2 1 2 1 2 1]; tests(8).bu_min = [2 1.8 2.2 1.5 2 1.8];
+tests(8).w = [1 2 1.5 0.5 1.2 0.8]; tests(8).cb = 1;
 
-        if isfield(info, 'orderings')
-            num_orders = length(info.orderings);
-        else
-            num_orders = 0;
-        end
+%% run MATLAB tests
+fprintf('[matlab]\n\n');
 
-        fprintf('  target rates: [%s]\n', num2str(target_rates));
-        fprintf('  achieved rates: [%s]\n', num2str(bu_a));
-        fprintf('  rate error: [%s]\n', num2str(bu_a - target_rates));
-        fprintf('  feasibility flag: %d\n', flag);
-        fprintf('  solution status: %s\n', info.sol_status);
-        fprintf('  clusters: %d, orders: %d, elapsed: %.3f s\n', ...
-            num_clusters, num_orders, elapsed);
+matlab_results = run_all_tests(@(H, Lx, bu_min, w, cb) minPMACMIMO(H, Lx, bu_min, w, cb, false), tests);
 
-        if expect_infeasible
+%% run C++ tests
+if cpp_available
+    fprintf('[cpp]\n\n');
 
-            if flag == 0
-                fprintf('  [p] infeasible case detected\n');
-            else
-                fprintf('  [x] infeasible case not detected\n');
-            end
+    cpp_results = run_all_tests(@(H, Lx, bu_min, w, cb) minPMACMIMO(H, Lx, bu_min, w, cb, true), tests);
 
-        else
+    %% comparison table
+    fprintf('[comparison]\n');
 
-            if flag > 0
-                fprintf('  [p] test passed\n');
-            else
-                fprintf('  [x] test failed (infeasible)\n');
-            end
+    fprintf('%-18s | %10s %10s | %10s %10s | %8s %8s | %7s\n', ...
+        'test', 'rate[.m]', 'rate[.cpp]', 'energy[.m]', 'energy[.cpp]', 'ms[.m]', 'ms[.cpp]', 'speedup');
+    fprintf('%s\n', repmat('-', 1, 100));
 
-        end
-
-    catch ME
-        fprintf('  [x] test crashed: %s\n', ME.message);
+    for t = 1:length(tests)
+        mr = matlab_results(t);
+        cr = cpp_results(t);
+        speedup = mr.elapsed_ms / max(cr.elapsed_ms, 0.01);
+        fprintf('%-18s | %10.4f %10.4f | %10.4f %10.4f | %8.2f %8.2f | %6.1fx\n', ...
+            tests(t).name, mr.total_rate, cr.total_rate, ...
+            mr.energy, cr.energy, mr.elapsed_ms, cr.elapsed_ms, speedup);
     end
 
     fprintf('\n');
+end
+
+%% helper functions
+
+function results = run_all_tests(solver, tests)
+    results = [];
+
+    for t = 1:length(tests)
+        tc = tests(t);
+        fprintf('[test] %s\n', tc.name);
+        result = run_test(solver, tc.H, tc.Lx, tc.bu_min, tc.w, tc.cb, tc.name);
+        results = [results; result];
+        fprintf('\n');
+    end
+
+end
+
+function result = run_test(solver, H, Lx, bu_min, w, cb, test_name)
+    result.passed = true;
+    result.elapsed_ms = 0;
+    result.total_rate = 0;
+    result.energy = 0;
+
+    try
+        tic;
+        [flag, bu_a, info] = solver(H, Lx, bu_min, w, cb);
+        elapsed = toc;
+        result.elapsed_ms = elapsed * 1000;
+
+        bu_min = bu_min(:)';
+        U = length(bu_min);
+        N = size(H, 3);
+
+        result.total_rate = sum(bu_a);
+        result.energy = sum(info.Eu_avg) * N;
+        rate_err = max(abs(bu_a - bu_min) ./ max(bu_min, 1e-12));
+
+        fprintf('  config: %d users, target rates = [%s]\n', U, num2str(bu_min, '%.4g '));
+        fprintf('  weights w: [%s]\n', num2str(w));
+        fprintf('  achieved rates: [%s]\n', num2str(bu_a));
+        fprintf('  total rate: %.4f\n', sum(bu_a));
+        fprintf('  average energy: [%s]\n', num2str(info.Eu_avg));
+        fprintf('  total energy: %.4f\n', result.energy);
+        fprintf('  feasibility flag: %d\n', flag);
+        fprintf('  rate constraint error: %.2e\n', rate_err);
+        fprintf('  elapsed time: %.3f ms\n', result.elapsed_ms);
+
+        if flag > 0
+            fprintf('  [p] problem is feasible (flag=%d)\n', flag);
+        else
+            fprintf('  [x] problem is infeasible\n');
+            result.passed = false;
+        end
+
+        if all(bu_a >= bu_min -1e-3)
+            fprintf('  [p] all rate constraints satisfied\n');
+        else
+            fprintf('  [x] rate constraints violated\n');
+            result.passed = false;
+        end
+
+        if result.passed
+            fprintf('  [p] test passed: %s\n', test_name);
+        else
+            fprintf('  [x] test failed: %s\n', test_name);
+        end
+
+    catch ME
+        result.passed = false;
+        fprintf('  [x] test crashed: %s\n', ME.message);
+
+        if ~isempty(ME.stack)
+            fprintf('  at %s (line %d)\n', ME.stack(1).name, ME.stack(1).line);
+        end
+
+    end
+
 end

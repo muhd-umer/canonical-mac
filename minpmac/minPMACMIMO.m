@@ -1,8 +1,11 @@
-function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
+function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex)
     %MINPMACMIMO Minimum power multi-user MIMO MAC (non-CVX implementation)
     %   [FEAS_FLAG, bu_a, info] = MINPMACMIMO(H, Lx, bu_min, w, cb) computes the
     %   optimal covariance matrices that satisfy user rate targets with minimum
     %   weighted energy for both SISO and MIMO MAC configurations.
+    %
+    %   [FEAS_FLAG, bu_a, info] = MINPMACMIMO(..., use_mex) uses the C++ MEX
+    %   implementation when use_mex is true. Default is true.
     %
     %   Inputs:
     %       H       channel matrix [Ly, sum(Lx), N] concatenated across users.
@@ -10,6 +13,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     %       bu_min  target rates per user [1, U] in bits per channel use.
     %       w       positive energy weights [1, U].
     %       cb      baseband type: 1 for complex, 2 for real (affects rate scaling).
+    %       use_mex (optional) use C++ MEX implementation (default: true).
     %
     %   Outputs:
     %       FEAS_FLAG   feasibility flag: 0 infeasible, 1 single order, 2 time-sharing.
@@ -18,20 +22,89 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb)
     %                   frac   time-sharing fractions for active decoding orders (empty if single order).
     %                   bun    per-tone bit allocations for the returned solution.
 
+    if nargin < 6
+        use_mex = true;
+    end
+
+    if use_mex
+
+        if exist('minpmac_mex', 'file') ~= 3
+            error('minPMACMIMO:mexNotFound', ...
+            'MEX file ''minpmac_mex'' not found. Compile it first or set use_mex=false.');
+        end
+
+        tic;
+        [~, Ltot, ~] = size(H);
+        bu_min = reshape(bu_min, [], 1);
+        w = reshape(w, [], 1);
+        U = length(bu_min);
+
+        if length(w) ~= U
+            error('w must have length U=%d', U);
+        end
+
+        if cb ~= 1 && cb ~= 2
+            error('cb must be 1 (complex) or 2 (real)');
+        end
+
+        if isscalar(Lx)
+            Lx_vec = ones(1, U) * Lx;
+        else
+            Lx_vec = reshape(Lx, 1, []);
+        end
+
+        if length(Lx_vec) ~= U
+            error('Lx must be a scalar or a length-U vector');
+        end
+
+        if sum(Lx_vec) ~= Ltot
+            error('sum(Lx)=%d must equal size(H,2)=%d', sum(Lx_vec), Ltot);
+        end
+
+        if isreal(H)
+            H = complex(H);
+        end
+
+        [feas_flag, bu_a_vec, bun, frac, Eu_avg] = minpmac_mex(H, Lx_vec, bu_min, w, cb);
+
+        FEAS_FLAG = feas_flag;
+        bu_a = bu_a_vec';
+
+        info = struct();
+        info.bun = bun;
+        info.frac = frac;
+        info.Eu_avg = Eu_avg';
+        info.elapsed_time = toc;
+        info.sol_status = 'Solved';
+        info.feasible = (FEAS_FLAG > 0);
+
+        return;
+    end
+
     this_dir = fileparts(mfilename('fullpath'));
     addpath(fullfile(this_dir, 'utils'));
 
     tic;
     [Ly, Ltot, N] = size(H);
-    U = length(Lx);
+    U = length(bu_min);
+
+    if isscalar(Lx)
+        Lx = ones(1, U) * Lx;
+    else
+        Lx = reshape(Lx, 1, []);
+    end
 
     % validate inputs
     if sum(Lx) ~= Ltot
         error('sum(Lx) = %d must equal total TX antennas = %d', sum(Lx), Ltot);
     end
 
-    if length(bu_min) ~= U || length(w) ~= U
-        error('bu_min and w must have length U=%d', U);
+    if length(Lx) ~= U
+        error('Lx must be a scalar or a length-U vector');
+    end
+
+    if length(w) ~= U
+        error('w must have length U=%d', U);
     end
 
     if ~all(w > 0)
