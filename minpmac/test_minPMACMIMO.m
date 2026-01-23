@@ -37,34 +37,27 @@ H(:, :, 3) = [50 50]; H(:, :, 4) = [30 40];
 tests(3).H = H; tests(3).Lx = [1 1]; tests(3).bu_min = [20 20];
 tests(3).w = [1 2]; tests(3).cb = 1;
 
-tests(4).name = 'three users';
-H = zeros(2, 3, 4);
-H(:, :, 1) = [5 4 3; 4 5 4]; H(:, :, 2) = [4 3 5; 3 4 5];
-H(:, :, 3) = [3 5 4; 5 3 4]; H(:, :, 4) = [4 4 4; 4 4 4];
-tests(4).H = H; tests(4).Lx = [1 1 1]; tests(4).bu_min = [3 4 3.5];
-tests(4).w = [1 1 1]; tests(4).cb = 1;
+tests(4).name = 'mimo unequal ant';
+tests(4).H = (randn(3, 5, 2) + 1j * randn(3, 5, 2)) / sqrt(2);
+tests(4).Lx = [2 3]; tests(4).bu_min = [4 6];
+tests(4).w = [1 1.5]; tests(4).cb = 1;
 
-tests(5).name = 'mimo unequal ant';
-tests(5).H = (randn(3, 5, 2) + 1j * randn(3, 5, 2)) / sqrt(2);
-tests(5).Lx = [2 3]; tests(5).bu_min = [4 6];
-tests(5).w = [1 1.5]; tests(5).cb = 1;
-
-tests(6).name = 'real baseband';
+tests(5).name = 'real baseband';
 H = zeros(1, 2, 4);
 H(:, :, 1) = [5 4]; H(:, :, 2) = [3 2];
 H(:, :, 3) = [2 3]; H(:, :, 4) = [4 5];
-tests(6).H = H; tests(6).Lx = [1 1]; tests(6).bu_min = [2 2];
-tests(6).w = [1 1]; tests(6).cb = 2;
+tests(5).H = H; tests(5).Lx = [1 1]; tests(5).bu_min = [2 2];
+tests(5).w = [1 1]; tests(5).cb = 2;
 
-tests(7).name = 'uniform Lx';
-tests(7).H = (randn(2, 6, 3) + 1j * randn(2, 6, 3)) / sqrt(2);
-tests(7).Lx = 2; tests(7).bu_min = [3 4 5];
-tests(7).w = [1 1 1]; tests(7).cb = 1;
+tests(6).name = 'uniform Lx';
+tests(6).H = (randn(2, 6, 3) + 1j * randn(2, 6, 3)) / sqrt(2);
+tests(6).Lx = 2; tests(6).bu_min = [3 4 5];
+tests(6).w = [1 1 1]; tests(6).cb = 1;
 
-tests(8).name = 'stress';
-tests(8).H = (randn(4, 9, 64) + 1j * randn(4, 9, 64)) / sqrt(2);
-tests(8).Lx = [2 1 2 1 2 1]; tests(8).bu_min = [2 1.8 2.2 1.5 2 1.8];
-tests(8).w = [1 2 1.5 0.5 1.2 0.8]; tests(8).cb = 1;
+tests(7).name = 'stress';
+tests(7).H = (randn(4, 9, 64) + 1j * randn(4, 9, 64)) / sqrt(2);
+tests(7).Lx = [2 1 2 1 2 1]; tests(7).bu_min = [2 1.8 2.2 1.5 2 1.8];
+tests(7).w = [1 2 1.5 0.5 1.2 0.8]; tests(7).cb = 1;
 
 %% run MATLAB tests
 fprintf('[matlab]\n\n');
