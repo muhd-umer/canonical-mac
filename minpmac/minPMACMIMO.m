@@ -14,6 +14,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
     %       w       positive energy weights [1, U].
     %       cb      baseband type: 1 for complex, 2 for real (affects rate scaling).
     %       use_mex (optional) use C++ MEX implementation (default: true).
+    %       use_cvx (optional) use CVX for time-sharing LP (default: false).
 
     %
     %   Outputs:
@@ -28,7 +29,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
     end
 
     if nargin < 7
-        use_cvx = true;
+        use_cvx = false;
     end
 
     if use_mex
@@ -221,7 +222,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
     else
         % multiple orders; solve for time-sharing weights
         [weights, bu_vertices, bun_orders, orderings] = time_sharing(H, ...
-            Rxx_opt, all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end);
+            Rxx_opt, all_orders, bu_min, Ly, U, N, cb, Lx, idx_start, idx_end, use_cvx);
 
         if isempty(weights)
             FEAS_FLAG = 0;
