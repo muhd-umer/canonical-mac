@@ -71,18 +71,18 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
             H = complex(H);
         end
 
-        [feas_flag, bu_a_vec, bun, frac, Eu_avg] = minpmac_mex(H, Lx_vec, bu_min, w, cb);
+        [feas_flag, bu_a_vec, info] = minpmac_mex(H, Lx_vec, bu_min, w, cb);
 
         FEAS_FLAG = feas_flag;
         bu_a = bu_a_vec';
 
-        info = struct();
-        info.bun = bun;
-        info.frac = frac;
-        info.Eu_avg = Eu_avg';
-        info.elapsed_time = toc;
-        info.sol_status = 'Solved';
-        info.feasible = (FEAS_FLAG > 0);
+        info.Eu_avg = info.Eu_avg';
+
+        if ~isempty(info.Rxx)
+            info.Rxx = {info.Rxx};
+        else
+            info.Rxx = {};
+        end
 
         return;
     end
