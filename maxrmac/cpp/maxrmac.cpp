@@ -310,16 +310,16 @@ MaxRMACResult maxRMACMIMO(const std::vector<MatrixXcd>& H,
         }
     }
 
-    compute_rates(H_work, Rxx_all, theta, Lxu, idx_start, idx_end, bun_nats);
-
-    MatrixXd bun = bun_nats / (std::log(2.0) * cb);
-
     if (single_tone_flag) {
         Eun *= scale_single;
         for (int u = 0; u < U; ++u) {
             Rxx_all[u][0] *= scale_single;
         }
     }
+
+    compute_rates(H_work, Rxx_all, theta, Lxu, idx_start, idx_end, bun_nats);
+
+    MatrixXd bun = bun_nats / (std::log(2.0) * cb);
 
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed =

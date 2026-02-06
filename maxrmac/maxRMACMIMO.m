@@ -240,9 +240,6 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb, use_mex)
     % recompute rates with scaled covariances (using theta-sorted decoding order)
     bun_nats = compute_rates(H, Rxx_cell, theta, Lxu_vec, idx_start, idx_end, Ly, U, N);
 
-    % convert rates from nats to bits and apply baseband scaling
-    bun = bun_nats / (log(2) * cb);
-
     % match CVX convention for N==1 energy/covariance scaling
     if single_tone_flag
         Eun = scale_single * Eun;
@@ -251,7 +248,10 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb, use_mex)
             Rxx_cell{u, 1} = scale_single * Rxx_cell{u, 1};
         end
 
+        bun_nats = compute_rates(H, Rxx_cell, theta, Lxu_vec, idx_start, idx_end, Ly, U, N);
     end
+
+    bun = bun_nats / (log(2) * cb);
 
     % assemble covariance outputs
     Lxu_max = max(Lxu_vec);
