@@ -5,7 +5,7 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb, use_mex)
     %   per-user total energy constraints.
     %
     %   [Rxxs, Eun, w, bun] = MAXRMACMIMO(..., use_mex) uses the C++ MEX
-    %   implementation when use_mex is true. Default is true..
+    %   implementation when use_mex is true. Default is true.
     %
     %   This uses the ellipsoid method to optimize the Lagrange dual over energy
     %   multipliers and L-BFGS to solve the per-tone inner maximization via
