@@ -7,6 +7,9 @@ logs/
 **.mat
 **.pkl
 .claude/
+.github/
+.agent/
+.cursor/
 tex/
 CLAUDE.local.md
 .DS_Store
