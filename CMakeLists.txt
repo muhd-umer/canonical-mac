@@ -109,13 +109,13 @@ target_link_libraries(maxrmac_lib PUBLIC
 
 set_target_properties(maxrmac_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(maxrmac_lib PRIVATE -fsanitize=address -g)
-    target_link_options(maxrmac_lib PRIVATE -fsanitize=address)
-endif()
-
 add_executable(test_maxrmac maxrmac/cpp/test_maxrmac.cpp)
 target_link_libraries(test_maxrmac PRIVATE maxrmac_lib)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(test_maxrmac PRIVATE -fsanitize=address -g)
+    target_link_options(test_maxrmac PRIVATE -fsanitize=address)
+endif()
 
 if(Matlab_FOUND)
     add_library(maxrmac_mex MODULE maxrmac/cpp/maxrmac_mex.cpp)
@@ -156,13 +156,13 @@ target_link_libraries(minpmac_lib PUBLIC
 
 set_target_properties(minpmac_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(minpmac_lib PRIVATE -fsanitize=address -g)
-    target_link_options(minpmac_lib PRIVATE -fsanitize=address)
-endif()
-
 add_executable(test_minpmac minpmac/cpp/test_minpmac.cpp)
 target_link_libraries(test_minpmac PRIVATE minpmac_lib)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(test_minpmac PRIVATE -fsanitize=address -g)
+    target_link_options(test_minpmac PRIVATE -fsanitize=address)
+endif()
 
 if(Matlab_FOUND)
     add_library(minpmac_mex MODULE minpmac/cpp/minpmac_mex.cpp)
@@ -185,12 +185,116 @@ if(Matlab_FOUND)
     endif()
 endif()
 
+## maxresmac
+
+add_library(maxresmac_lib STATIC
+    maxresmac/cpp/solve_tone.cpp
+    maxresmac/cpp/maxresmac.cpp
+)
+
+target_include_directories(maxresmac_lib PUBLIC
+    ${CMAKE_SOURCE_DIR}/maxresmac/cpp
+)
+
+target_link_libraries(maxresmac_lib PUBLIC
+    Eigen3::Eigen
+    OpenMP::OpenMP_CXX
+)
+
+set_target_properties(maxresmac_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+add_executable(test_maxresmac maxresmac/cpp/test_maxresmac.cpp)
+target_link_libraries(test_maxresmac PRIVATE maxresmac_lib)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(test_maxresmac PRIVATE -fsanitize=address -g)
+    target_link_options(test_maxresmac PRIVATE -fsanitize=address)
+endif()
+
+if(Matlab_FOUND)
+    add_library(maxresmac_mex MODULE maxresmac/cpp/maxresmac_mex.cpp)
+
+    target_include_directories(maxresmac_mex PRIVATE ${Matlab_INCLUDE_DIRS})
+    target_link_libraries(maxresmac_mex PRIVATE maxresmac_lib ${Matlab_MX_LIBRARY} ${Matlab_MEX_LIBRARY})
+
+    target_compile_definitions(maxresmac_mex PRIVATE MATLAB_MEX_FILE MATLAB_DEFAULT_RELEASE=R2018a)
+
+    set_target_properties(maxresmac_mex PROPERTIES
+        PREFIX ""
+        SUFFIX ".${MEX_EXT}"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/maxresmac"
+    )
+
+    if(APPLE)
+        set_target_properties(maxresmac_mex PROPERTIES LINK_FLAGS "-undefined dynamic_lookup -flat_namespace")
+    else()
+        target_link_options(maxresmac_mex PRIVATE -static-libgcc -static-libstdc++)
+    endif()
+endif()
+
+## admmac
+
+add_library(admmac_lib STATIC
+    admmac/cpp/admmac.cpp
+)
+
+target_include_directories(admmac_lib PUBLIC
+    ${CMAKE_SOURCE_DIR}/admmac/cpp
+)
+
+target_link_libraries(admmac_lib PUBLIC maxrmac_lib)
+
+set_target_properties(admmac_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+add_executable(test_admmac admmac/cpp/test_admmac.cpp)
+target_link_libraries(test_admmac PRIVATE admmac_lib)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(test_admmac PRIVATE -fsanitize=address -g)
+    target_link_options(test_admmac PRIVATE -fsanitize=address)
+endif()
+
+if(Matlab_FOUND)
+    add_library(admmac_mex MODULE admmac/cpp/admmac_mex.cpp)
+
+    target_include_directories(admmac_mex PRIVATE ${Matlab_INCLUDE_DIRS})
+    target_link_libraries(admmac_mex PRIVATE admmac_lib ${Matlab_MX_LIBRARY} ${Matlab_MEX_LIBRARY})
+
+    target_compile_definitions(admmac_mex PRIVATE MATLAB_MEX_FILE MATLAB_DEFAULT_RELEASE=R2018a)
+
+    set_target_properties(admmac_mex PROPERTIES
+        PREFIX ""
+        SUFFIX ".${MEX_EXT}"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/admmac"
+    )
+
+    if(APPLE)
+        set_target_properties(admmac_mex PROPERTIES LINK_FLAGS "-undefined dynamic_lookup -flat_namespace")
+    else()
+        target_link_options(admmac_mex PRIVATE -static-libgcc -static-libstdc++)
+    endif()
+endif()
+
+## install
+
 install(TARGETS maxrmac_lib ARCHIVE DESTINATION lib)
 install(FILES
     maxrmac/cpp/maxrmac.hpp
     maxrmac/cpp/solve_tone.hpp
     maxrmac/cpp/linalg_utils.hpp
     DESTINATION include/maxrmac
+)
+
+install(TARGETS maxresmac_lib ARCHIVE DESTINATION lib)
+install(FILES
+    maxresmac/cpp/maxresmac.hpp
+    DESTINATION include/maxresmac
+)
+
+install(TARGETS admmac_lib ARCHIVE DESTINATION lib)
+install(FILES
+    admmac/cpp/admmac.hpp
+    DESTINATION include/admmac
 )
 
 if(BUILD_MINPMAC)
@@ -200,5 +304,5 @@ if(BUILD_MINPMAC)
         minpmac/cpp/solve_tone.hpp
         minpmac/cpp/linalg_utils.hpp
         DESTINATION include/minpmac
-    ) 
+    )
 endif()

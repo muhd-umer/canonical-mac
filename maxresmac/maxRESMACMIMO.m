@@ -1,8 +1,11 @@
-function [Rxxs, Eun, w, bun] = maxRESMACMIMO(H, Lxu, Etotal, theta, cb)
+function [Rxxs, Eun, w, bun] = maxRESMACMIMO(H, Lxu, Etotal, theta, cb, use_mex)
     %MAXRESMACMIMO Maximize weighted rate sum subject to total energy constraint
     %   [Rxxs, Eun, w, bun] = MAXRESMACMIMO(H, Lxu, Etotal, theta, cb) computes
     %   the optimal covariance matrices that maximize the weighted rate sum
     %   subject to a total sum-energy constraint for MIMO MAC.
+    %
+    %   [Rxxs, Eun, w, bun] = MAXRESMACMIMO(..., use_mex) uses the C++ MEX
+    %   implementation when use_mex is true. Default is true.
     %
     %   Inputs:
     %       H       channel matrix [Ly, sum(Lxu), N] concatenated across users.
@@ -11,6 +14,7 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO(H, Lxu, Etotal, theta, cb)
     %       Etotal  total sum-energy constraint (scalar).
     %       theta   rate weights per user [U, 1] or [1, U].
     %       cb      baseband type: 1 for complex, 2 for real (affects rate scaling).
+    %       use_mex (optional) use C++ MEX implementation (default: true).
     %
     %   Outputs:
     %       Rxxs    U-by-N cell array of Rxx(u,n) matrices, or Lxu_max-by-Lxu_max-by-U-by-N
@@ -18,6 +22,56 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO(H, Lxu, Etotal, theta, cb)
     %       Eun     U x N energy distribution matrix.
     %       w       U x 1 Lagrangian multiplier vector w.r.t. energy constraints.
     %       bun     U x N bit distribution matrix for all users.
+
+    if nargin < 6
+        use_mex = true;
+    end
+
+    if use_mex && exist('maxresmac_mex', 'file') == 3
+        [~, Ltot, ~] = size(H);
+        theta = reshape(theta, [], 1);
+        U = length(theta);
+
+        if isscalar(Lxu)
+            Lxu_vec = ones(1, U) * Lxu;
+            uniform_flag = true;
+        else
+            Lxu_vec = reshape(Lxu, 1, []);
+            uniform_flag = false;
+        end
+
+        if isreal(H)
+            H = complex(H);
+        end
+
+        [Rxx_cell, Eun, w, bun] = maxresmac_mex(H, Lxu_vec, sum(Etotal(:)), theta, cb);
+
+        N = size(bun, 2);
+        Lxu_max = max(Lxu_vec);
+
+        if uniform_flag
+            Rxxs = zeros(Lxu_max, Lxu_max, U, N);
+
+            for u = 1:U
+
+                for n = 1:N
+                    Rxxs(1:Lxu_vec(u), 1:Lxu_vec(u), u, n) = Rxx_cell{u, n};
+                end
+
+            end
+
+        else
+            Rxxs = Rxx_cell;
+        end
+
+        if uniform_flag
+            Rxxs = real(Rxxs);
+        else
+            Rxxs = cellfun(@real, Rxxs, 'UniformOutput', false);
+        end
+
+        return;
+    end
 
     this_dir = fileparts(mfilename('fullpath'));
     addpath(fullfile(this_dir, 'utils'));

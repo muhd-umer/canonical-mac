@@ -4,157 +4,159 @@ clear;
 clc;
 rng(42);
 
-fprintf('[test] basic siso feasible (2 users, 4 tones)\n');
-H_siso = zeros(1, 2, 4);
-H_siso(:, :, 1) = [80 60];
-H_siso(:, :, 2) = [40 30];
-H_siso(:, :, 3) = [50 50];
-H_siso(:, :, 4) = [30 40];
-Lxu = [1 1];
-bu = [5; 5];
-Eu = [1; 1];
-cb = 1;
+cpp_available = exist('admmac_mex', 'file') == 3;
 
-run_test(@() admMACMIMO(H_siso, Lxu, bu, Eu, cb), bu, Eu, 'basic siso feasible');
+if cpp_available
+    fprintf('[info] MEX implementation available\n\n');
+else
+    fprintf('[info] MEX not found; testing MATLAB only\n');
+    fprintf('[info] Build with: cd build && cmake .. && make admmac_mex\n\n');
+end
 
-fprintf('[test] siso infeasible (low energy)\n');
-bu_inf = [5; 5];
-Eu_inf = [0.001; 0.001];
+%% test definitions
+tests = struct();
 
-run_test(@() admMACMIMO(H_siso, Lxu, bu_inf, Eu_inf, cb), bu_inf, Eu_inf, ...
-    'siso infeasible (low energy)', true);
+tests(1).name = 'basic siso feas';
+H = zeros(1, 2, 4);
+H(:, :, 1) = [80 60]; H(:, :, 2) = [40 30];
+H(:, :, 3) = [50 50]; H(:, :, 4) = [30 40];
+tests(1).H = H; tests(1).Lxu = [1 1];
+tests(1).bu = [5; 5]; tests(1).Eu = [1; 1];
+tests(1).cb = 1; tests(1).expect_infeasible = false;
 
-fprintf('[test] siso infeasible (high rate)\n');
-bu_high = [100; 100];
-Eu_high = [1; 1];
+tests(2).name = 'infeas low energy';
+tests(2).H = tests(1).H; tests(2).Lxu = [1 1];
+tests(2).bu = [5; 5]; tests(2).Eu = [0.001; 0.001];
+tests(2).cb = 1; tests(2).expect_infeasible = true;
 
-run_test(@() admMACMIMO(H_siso, Lxu, bu_high, Eu_high, cb), bu_high, Eu_high, ...
-    'siso infeasible (high rate)', true);
+tests(3).name = 'infeas high rate';
+tests(3).H = tests(1).H; tests(3).Lxu = [1 1];
+tests(3).bu = [100; 100]; tests(3).Eu = [1; 1];
+tests(3).cb = 1; tests(3).expect_infeasible = true;
 
-fprintf('[test] siso vertex sharing (equal channels)\n');
-H_eq = zeros(1, 3, 2);
-H_eq(:, :, 1) = [80 80 80];
-H_eq(:, :, 2) = [60 60 60];
-Lxu_eq = [1 1 1];
-bu_eq = [3; 2.5; 2];
-Eu_eq = [1; 1; 1];
+tests(4).name = 'vertex sharing';
+H = zeros(1, 3, 2);
+H(:, :, 1) = [80 80 80]; H(:, :, 2) = [60 60 60];
+tests(4).H = H; tests(4).Lxu = [1 1 1];
+tests(4).bu = [3; 2.5; 2]; tests(4).Eu = [1; 1; 1];
+tests(4).cb = 1; tests(4).expect_infeasible = false;
 
-run_test(@() admMACMIMO(H_eq, Lxu_eq, bu_eq, Eu_eq, cb), bu_eq, Eu_eq, ...
-'siso vertex sharing');
+tests(5).name = 'basic mimo';
+H = zeros(2, 4, 2);
+H(:, 1:2, 1) = [3.2 2.1; 1.8 2.9]; H(:, 3:4, 1) = [2.5 3.0; 2.2 1.9];
+H(:, 1:2, 2) = [2.9 2.5; 2.0 3.1]; H(:, 3:4, 2) = [2.8 2.3; 1.7 2.6];
+tests(5).H = H; tests(5).Lxu = [2 2];
+tests(5).bu = [5; 5]; tests(5).Eu = [2; 2];
+tests(5).cb = 1; tests(5).expect_infeasible = false;
 
-fprintf('[test] basic mimo (2 users, 2x2, 2 tones)\n');
-Ly = 2;
-Lxu_mimo = [2 2];
-N = 2;
-H_mimo = zeros(Ly, sum(Lxu_mimo), N);
-H_mimo(:, 1:2, 1) = [3.2 2.1; 1.8 2.9];
-H_mimo(:, 3:4, 1) = [2.5 3.0; 2.2 1.9];
-H_mimo(:, 1:2, 2) = [2.9 2.5; 2.0 3.1];
-H_mimo(:, 3:4, 2) = [2.8 2.3; 1.7 2.6];
-bu_mimo = [5; 5];
-Eu_mimo = [2; 2];
+tests(6).name = 'mimo multi-tone';
+tests(6).H = (randn(2, 4, 8) + 1j * randn(2, 4, 8)) / sqrt(2);
+tests(6).Lxu = [2 2];
+tests(6).bu = [8; 8]; tests(6).Eu = [3; 3];
+tests(6).cb = 1; tests(6).expect_infeasible = false;
 
-run_test(@() admMACMIMO(H_mimo, Lxu_mimo, bu_mimo, Eu_mimo, cb), ...
-    bu_mimo, Eu_mimo, 'basic mimo');
+tests(7).name = 'single tone';
+H = reshape([80 60], 1, 2, 1);
+tests(7).H = H; tests(7).Lxu = [1 1];
+tests(7).bu = [2; 2]; tests(7).Eu = [0.5; 0.5];
+tests(7).cb = 1; tests(7).expect_infeasible = false;
 
-fprintf('[test] mimo multi-tone (8 tones)\n');
-Ly = 2;
-Lxu_mt = [2, 2];
-N = 8;
-H_multi = (randn(Ly, sum(Lxu_mt), N) + 1j * randn(Ly, sum(Lxu_mt), N)) / sqrt(2);
-bu_mt = [8; 8];
-Eu_mt = [3; 3];
+tests(8).name = 'three users';
+H = zeros(2, 3, 4);
+H(:, :, 1) = [5 4 3; 4 5 4]; H(:, :, 2) = [4 3 5; 3 4 5];
+H(:, :, 3) = [3 5 4; 5 3 4]; H(:, :, 4) = [4 4 4; 4 4 4];
+tests(8).H = H; tests(8).Lxu = [1 1 1];
+tests(8).bu = [2; 2; 2]; tests(8).Eu = [1; 1; 1];
+tests(8).cb = 1; tests(8).expect_infeasible = false;
 
-run_test(@() admMACMIMO(H_multi, Lxu_mt, bu_mt, Eu_mt, cb), ...
-    bu_mt, Eu_mt, 'mimo multi-tone');
+tests(9).name = 'mimo unequal ant';
+tests(9).H = (randn(3, 5, 2) + 1j * randn(3, 5, 2)) / sqrt(2);
+tests(9).Lxu = [2 3];
+tests(9).bu = [3; 3]; tests(9).Eu = [2; 3];
+tests(9).cb = 1; tests(9).expect_infeasible = false;
 
-fprintf('[test] single tone\n');
-H_single = reshape([80 60], 1, 2, 1);
-Lxu_single = [1 1];
-bu_single = [2; 2];
-Eu_single = [0.5; 0.5];
+tests(10).name = 'real baseband';
+H = randn(2, 3, 4);
+tests(10).H = H; tests(10).Lxu = [1 1 1];
+tests(10).bu = [1; 1; 1]; tests(10).Eu = [1; 1; 1];
+tests(10).cb = 2; tests(10).expect_infeasible = false;
 
-run_test(@() admMACMIMO(H_single, Lxu_single, bu_single, Eu_single, cb), ...
-    bu_single, Eu_single, 'single tone');
+tests(11).name = 'uniform Lxu';
+tests(11).H = (randn(2, 6, 3) + 1j * randn(2, 6, 3)) / sqrt(2);
+tests(11).Lxu = 2;
+tests(11).bu = [4; 4; 4]; tests(11).Eu = [2; 2; 2];
+tests(11).cb = 1; tests(11).expect_infeasible = false;
 
-fprintf('[test] three users siso\n');
-H_3u = zeros(2, 3, 4);
-H_3u(:, :, 1) = [5 4 3; 4 5 4];
-H_3u(:, :, 2) = [4 3 5; 3 4 5];
-H_3u(:, :, 3) = [3 5 4; 5 3 4];
-H_3u(:, :, 4) = [4 4 4; 4 4 4];
-Lxu_3u = [1 1 1];
-bu_3u = [2; 2; 2];
-Eu_3u = [1; 1; 1];
+tests(12).name = 'stress';
+tests(12).H = (randn(4, 9, 64) + 1j * randn(4, 9, 64)) / sqrt(2);
+tests(12).Lxu = [2 1 2 1 2 1];
+tests(12).bu = [4; 5; 4; 3; 4; 3]; tests(12).Eu = [2; 3; 2; 1.5; 2; 1.5];
+tests(12).cb = 1; tests(12).expect_infeasible = false;
 
-run_test(@() admMACMIMO(H_3u, Lxu_3u, bu_3u, Eu_3u, cb), ...
-    bu_3u, Eu_3u, 'three users siso');
+tests(13).name = 'boundary feas';
+H = zeros(1, 2, 2);
+H(:, :, 1) = [50 40]; H(:, :, 2) = [45 35];
+tests(13).H = H; tests(13).Lxu = [1 1];
+tests(13).bu = [4; 4]; tests(13).Eu = [0.5; 0.5];
+tests(13).cb = 1; tests(13).expect_infeasible = false;
 
-fprintf('[test] mimo with unequal antennas\n');
-Ly = 3;
-Lxu_mixed = [2 3];
-N = 2;
-H_mixed = (randn(Ly, sum(Lxu_mixed), N) + 1j * randn(Ly, sum(Lxu_mixed), N)) / sqrt(2);
-bu_mixed = [3; 3];
-Eu_mixed = [2; 3];
+%% run MATLAB tests
+fprintf('[matlab]\n\n');
 
-run_test(@() admMACMIMO(H_mixed, Lxu_mixed, bu_mixed, Eu_mixed, cb), ...
-    bu_mixed, Eu_mixed, 'mimo unequal antennas');
+matlab_results = run_all_tests(@(H, Lxu, bu, Eu, cb) admMACMIMO(H, Lxu, bu, Eu, cb, false), tests);
 
-fprintf('[test] real baseband\n');
-H_real = randn(2, 3, 4);
-Lxu_real = [1 1 1];
-bu_real = [1; 1; 1];
-Eu_real = [1; 1; 1];
-cb_real = 2;
+%% run C++ tests
+if cpp_available
+    fprintf('[cpp]\n\n');
 
-run_test(@() admMACMIMO(H_real, Lxu_real, bu_real, Eu_real, cb_real), ...
-    bu_real, Eu_real, 'real baseband');
+    cpp_results = run_all_tests(@(H, Lxu, bu, Eu, cb) admMACMIMO(H, Lxu, bu, Eu, cb, true), tests);
 
-fprintf('[test] uniform antennas (scalar Lxu)\n');
-Ly = 2;
-U = 3;
-Lxu_scalar = 2;
-N = 3;
-H_uniform = (randn(Ly, U * Lxu_scalar, N) + 1j * randn(Ly, U * Lxu_scalar, N)) / sqrt(2);
-bu_uniform = [4; 4; 4];
-Eu_uniform = [2; 2; 2];
+    %% comparison table
+    fprintf('[comparison]\n');
 
-run_test(@() admMACMIMO(H_uniform, Lxu_scalar, bu_uniform, Eu_uniform, cb), ...
-    bu_uniform, Eu_uniform, 'uniform antennas');
+    fprintf('%-18s | %5s %5s | %10s %10s | %8s %8s | %7s\n', ...
+        'test', 'f[.m]', 'f[.c]', 'margin[.m]', 'margin[.c]', 'ms[.m]', 'ms[.cpp]', 'speedup');
+    fprintf('%s\n', repmat('-', 1, 90));
 
-fprintf('[test] stress test\n');
-Ly = 4;
-Lxu_stress = [2 1 2 1 2 1];
-N = 64;
-H_stress = (randn(Ly, sum(Lxu_stress), N) + 1j * randn(Ly, sum(Lxu_stress), N)) / sqrt(2);
-bu_stress = [4; 5; 4; 3; 4; 3];
-Eu_stress = [2; 3; 2; 1.5; 2; 1.5];
+    for t = 1:length(tests)
+        mr = matlab_results(t);
+        cr = cpp_results(t);
+        speedup = mr.elapsed_ms / max(cr.elapsed_ms, 0.01);
+        fprintf('%-18s | %5d %5d | %10.4f %10.4f | %8.2f %8.2f | %6.1fx\n', ...
+            tests(t).name, mr.feas_flag, cr.feas_flag, ...
+            mr.min_margin, cr.min_margin, mr.elapsed_ms, cr.elapsed_ms, speedup);
+    end
 
-run_test(@() admMACMIMO(H_stress, Lxu_stress, bu_stress, Eu_stress, cb), ...
-    bu_stress, Eu_stress, 'stress test');
-
-fprintf('[test] boundary feasibility\n');
-H_bnd = zeros(1, 2, 2);
-H_bnd(:, :, 1) = [50 40];
-H_bnd(:, :, 2) = [45 35];
-bu_bnd = [4; 4];
-Eu_bnd = [0.5; 0.5];
-
-run_test(@() admMACMIMO(H_bnd, Lxu, bu_bnd, Eu_bnd, cb), ...
-    bu_bnd, Eu_bnd, 'boundary feasibility');
+    fprintf('\n');
+end
 
 %% helper functions
-function run_test(solver, bu, Eu, test_name, expect_infeasible)
 
-    if nargin < 5
-        expect_infeasible = false;
+function results = run_all_tests(solver, tests)
+    results = [];
+
+    for t = 1:length(tests)
+        tc = tests(t);
+        fprintf('[test] %s\n', tc.name);
+        result = run_test(solver, tc.H, tc.Lxu, tc.bu, tc.Eu, tc.cb, tc.name, tc.expect_infeasible);
+        results = [results; result];
+        fprintf('\n');
     end
+
+end
+
+function result = run_test(solver, H, Lxu, bu, Eu, cb, test_name, expect_infeasible)
+    result.passed = true;
+    result.elapsed_ms = 0;
+    result.feas_flag = 0;
+    result.min_margin = -Inf;
 
     try
         tic;
-        [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = solver();
+        [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = solver(H, Lxu, bu, Eu, cb);
         elapsed = toc;
+        result.elapsed_ms = elapsed * 1000;
+        result.feas_flag = FEAS_FLAG;
 
         bu = bu(:);
         Eu = Eu(:);
@@ -170,18 +172,18 @@ function run_test(solver, bu, Eu, test_name, expect_infeasible)
             fprintf('  rate margin: [%s]\n', num2str((bu_a - bu)'));
             fprintf('  theta: [%s]\n', num2str(theta'));
             fprintf('  w: [%s]\n', num2str(w'));
-            fprintf('  elapsed: %.3f s\n', elapsed);
+            fprintf('  elapsed: %.3f ms\n', result.elapsed_ms);
 
-            % check rates meet targets
             rate_margin = min(bu_a - bu);
+            result.min_margin = rate_margin;
 
             if rate_margin >= -1e-4
                 fprintf('  [p] all target rates met (min margin: %.6f)\n', rate_margin);
             else
                 fprintf('  [x] some target rates not met (min margin: %.6f)\n', rate_margin);
+                result.passed = false;
             end
 
-            % check energy constraints
             if ~isequal(Eun, 0)
                 energy_used = sum(Eun, 2);
                 energy_margin = Eu - energy_used;
@@ -190,11 +192,11 @@ function run_test(solver, bu, Eu, test_name, expect_infeasible)
                     fprintf('  [p] all energy constraints satisfied\n');
                 else
                     fprintf('  [x] some energy constraints violated\n');
+                    result.passed = false;
                 end
 
             end
 
-            % check psd constraint for Rxxs
             if ~isequal(Rxxs, 0)
                 psd_ok = check_psd(Rxxs);
 
@@ -202,11 +204,11 @@ function run_test(solver, bu, Eu, test_name, expect_infeasible)
                     fprintf('  [p] covariance matrices are PSD\n');
                 else
                     fprintf('  [x] some covariance matrices are not PSD\n');
+                    result.passed = false;
                 end
 
             end
 
-            % check info structure
             if ~isempty(info)
 
                 if istable(info)
@@ -219,7 +221,8 @@ function run_test(solver, bu, Eu, test_name, expect_infeasible)
 
         else
             fprintf('  achieved rates: [%s]\n', num2str(bu_a'));
-            fprintf('  elapsed: %.3f s\n', elapsed);
+            fprintf('  elapsed: %.3f ms\n', result.elapsed_ms);
+            result.min_margin = -Inf;
         end
 
         if expect_infeasible
@@ -228,6 +231,7 @@ function run_test(solver, bu, Eu, test_name, expect_infeasible)
                 fprintf('  [p] infeasible case correctly detected\n');
             else
                 fprintf('  [x] expected infeasible but got FEAS_FLAG=%d\n', FEAS_FLAG);
+                result.passed = false;
             end
 
         else
@@ -236,11 +240,13 @@ function run_test(solver, bu, Eu, test_name, expect_infeasible)
                 fprintf('  [p] test passed: %s\n', test_name);
             else
                 fprintf('  [x] test failed: expected feasible but got FEAS_FLAG=0\n');
+                result.passed = false;
             end
 
         end
 
     catch ME
+        result.passed = false;
         fprintf('  [x] test crashed: %s\n', ME.message);
 
         if ~isempty(ME.stack)
@@ -249,7 +255,6 @@ function run_test(solver, bu, Eu, test_name, expect_infeasible)
 
     end
 
-    fprintf('\n');
 end
 
 function psd_ok = check_psd(Rxxs)

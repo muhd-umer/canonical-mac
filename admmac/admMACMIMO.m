@@ -1,9 +1,12 @@
-function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMACMIMO(H, Lxu, bu, Eu, cb)
+function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMACMIMO(H, Lxu, bu, Eu, cb, use_mex)
     %ADMMACMIMO Determine feasibility of target rates under energy constraints
     %   [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = ADMMACMIMO(H, Lxu, bu, Eu, cb)
     %   determines whether the target rate vector bu is feasible for the
     %   (noise-whitened) multi-user MIMO MAC channel H given per-user energy
     %   constraints Eu.
+    %
+    %   [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = ADMMACMIMO(..., use_mex)
+    %   uses the C++ MEX implementation when use_mex is true. Default is true.
     %
     %   Inputs:
     %       H       channel tensor [Ly, sum(Lxu), N] with user antennas stacked.
@@ -15,6 +18,7 @@ function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMACMIMO(H, Lxu, bu, E
     %       bu      target rate of each user, length-U vector (bits per channel use).
     %       Eu      energy/symbol constraint for each user, length-U vector.
     %       cb      baseband type: 1 for complex, 2 for real.
+    %       use_mex (optional) use C++ MEX implementation (default: true).
     %
     %   Outputs:
     %       FEAS_FLAG   feasibility indicator:
@@ -33,9 +37,95 @@ function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMACMIMO(H, Lxu, bu, E
     %       info        detailed solution information (depends on FEAS_FLAG):
     %                   - if FEAS_FLAG=0: empty cell
     %                   - if FEAS_FLAG=1: 1-row table with {bu_v, bun, order}
-
     %                   - if FEAS_FLAG=2: v-row table with {bu_v, bun, order, frac, clusterID}
-    
+
+    if nargin < 6
+        use_mex = true;
+    end
+
+    if use_mex && exist('admmac_mex', 'file') == 3
+        [~, Ltot, ~] = size(H);
+        bu = reshape(bu, [], 1);
+        Eu = reshape(Eu, [], 1);
+        U = length(bu);
+
+        if isscalar(Lxu)
+            SCALAR_FLAG = true;
+            Lxu_vec = ones(1, U) * Lxu;
+        else
+            SCALAR_FLAG = false;
+            Lxu_vec = reshape(Lxu, 1, []);
+        end
+
+        if isreal(H)
+            H = complex(H);
+        end
+
+        [FEAS_FLAG, bu_a, Rxxs_cell, Eun, theta, w, info_s] = ...
+            admmac_mex(H, Lxu_vec, bu, Eu, cb);
+
+        FEAS_FLAG = int32(FEAS_FLAG);
+
+        if FEAS_FLAG > 0 && iscell(Rxxs_cell)
+            N = size(Rxxs_cell, 2);
+            Lxu_max = max(Lxu_vec);
+
+            if SCALAR_FLAG
+                Rxxs = zeros(Lxu_max, Lxu_max, U, N);
+
+                for u = 1:U
+
+                    for n = 1:N
+                        R = Rxxs_cell{u, n};
+                        Lu = Lxu_vec(u);
+                        Rxxs(1:Lu, 1:Lu, u, n) = real(R);
+                    end
+
+                end
+
+            else
+                Rxxs = cellfun(@real, Rxxs_cell, 'UniformOutput', false);
+            end
+
+        else
+            Rxxs = Rxxs_cell;
+        end
+
+        if isstruct(info_s) && FEAS_FLAG > 0
+            nv = length(info_s);
+            bu_v_all = zeros(nv, U);
+            bun_all = cell(nv, 1);
+            order_all = cell(nv, 1);
+
+            for v = 1:nv
+                bu_v_all(v, :) = info_s(v).bu_v;
+                bun_all{v} = info_s(v).bun;
+                order_all{v} = info_s(v).order;
+            end
+
+            if FEAS_FLAG == 1
+                info = table(bu_v_all, bun_all, order_all, ...
+                    'VariableNames', {'bu_v', 'bun', 'order'});
+            else
+                frac_all = zeros(nv, 1);
+                clusterID_all = zeros(nv, 1);
+
+                for v = 1:nv
+                    frac_all(v) = info_s(v).frac;
+                    clusterID_all(v) = info_s(v).clusterID;
+                end
+
+                info = table(bu_v_all, bun_all, order_all, frac_all, clusterID_all, ...
+                    'VariableNames', {'bu_v', 'bun', 'order', 'frac', 'clusterID'});
+            end
+
+        else
+            info = {};
+        end
+
+        return;
+    end
+
     this_dir = fileparts(mfilename('fullpath'));
     addpath(fullfile(this_dir, 'utils'));
     addpath(fullfile(this_dir, '..', 'maxrmac'));
@@ -85,7 +175,7 @@ function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMACMIMO(H, Lxu, bu, E
         count = count + 1;
 
         % get the next vertex via maxRMACMIMO
-        [Rxxstemp, Eun_iter, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb);
+        [Rxxstemp, Eun_iter, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb, use_mex);
 
         % store last values
         last_Rxxs = Rxxstemp;
