@@ -238,8 +238,6 @@ MaxRMACResult maxRMACMIMO(const std::vector<MatrixXcd>& H,
     const double scale_A = U_sq / (U_sq - 1);
     const double scale_A_gt = 2.0 / (U + 1);
 
-    const double energy_rel_tol = 1e-4;
-
     while (true) {
         ++iter;
 
@@ -247,15 +245,6 @@ MaxRMACResult maxRMACMIMO(const std::vector<MatrixXcd>& H,
                      workspaces, f, bun_nats, Eun, Rxx_all);
 
         VectorXd g = Eu_work - Eun.rowwise().sum();
-
-        double max_rel_err = 0.0;
-        for (int u = 0; u < U; ++u) {
-            max_rel_err = std::max(
-                max_rel_err, std::abs(g(u)) / std::max(Eu_work(u), 1e-12));
-        }
-        if (max_rel_err < energy_rel_tol) {
-            break;
-        }
 
         double gAg = g.transpose() * A * g;
 
@@ -272,18 +261,24 @@ MaxRMACResult maxRMACMIMO(const std::vector<MatrixXcd>& H,
         w -= inv_U_plus_1 * Agt;
         A = scale_A * (A - scale_A_gt * Agt * gt.transpose() * A);
 
-        for (int u = 0; u < U; ++u) {
-            if (w(u) < 0) {
-                VectorXd g_proj = VectorXd::Zero(U);
-                g_proj(u) = -1.0;
-                double gAg_proj = A(u, u);
+        bool has_negative = true;
+        while (has_negative) {
+            has_negative = false;
+            for (int u = 0; u < U; ++u) {
+                if (w(u) < 0) {
+                    VectorXd g_proj = VectorXd::Zero(U);
+                    g_proj(u) = -1.0;
+                    double gAg_proj = g_proj.transpose() * A * g_proj;
 
-                double inv_sqrt_gAg_proj = 1.0 / std::sqrt(gAg_proj);
-                VectorXd gt_proj = g_proj * inv_sqrt_gAg_proj;
-                VectorXd Agt_proj = A * gt_proj;
-                w -= inv_U_plus_1 * Agt_proj;
-                A = scale_A *
-                    (A - scale_A_gt * Agt_proj * gt_proj.transpose() * A);
+                    double inv_sqrt_gAg_proj = 1.0 / std::sqrt(gAg_proj);
+                    VectorXd gt_proj = g_proj * inv_sqrt_gAg_proj;
+                    VectorXd Agt_proj = A * gt_proj;
+                    w -= inv_U_plus_1 * Agt_proj;
+                    A = scale_A *
+                        (A - scale_A_gt * Agt_proj * gt_proj.transpose() * A);
+                    has_negative = true;
+                    break;
+                }
             }
         }
     }
