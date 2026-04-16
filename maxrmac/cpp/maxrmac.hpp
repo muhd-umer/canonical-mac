@@ -4,6 +4,9 @@
  *
  * Implements weighted sum-rate maximization subject to per-user
  * energy constraints using ellipsoid method + L-BFGS.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

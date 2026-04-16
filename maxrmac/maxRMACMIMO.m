@@ -26,6 +26,9 @@ function [Rxxs, Eun, w, bun] = maxRMACMIMO(H, Lxu, Eu, theta, cb, use_mex)
     %       Eun     U-by-N energy allocation, Eun(u,n)=trace(Rxx(u,n)).
     %       w       U-by-1 dual variables for energy constraints.
     %       bun     U-by-N per-user per-tone rates (bits).
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     if nargin < 6
         use_mex = true;

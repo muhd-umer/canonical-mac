@@ -5,6 +5,9 @@
  * Determines whether target rate vector bu is feasible under per-user
  * energy constraints Eu, using ellipsoid method with maxRMACMIMO as
  * subroutine. Supports time-sharing between multiple decoding orders.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

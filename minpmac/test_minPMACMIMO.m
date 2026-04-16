@@ -1,4 +1,7 @@
 %TEST_MINPMACMIMO Collection of tests for minPMACMIMO
+%
+%   Author: Muhammad Umer
+%   Organization: Stanford University
 
 clear;
 clc;

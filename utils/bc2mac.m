@@ -14,6 +14,9 @@ function Rxxm = bc2mac(Rxxb, Hmac)
     %   Output:
     %       Rxxm    Ly-by-Ly-by-U array of dual MAC covariance matrices.
     %               The user order is restored to match the input ordering.
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [Ly, ~, U] = size(Hmac);
     H = conj(permute(Hmac(:, :, end:-1:1), [2, 1, 3]));

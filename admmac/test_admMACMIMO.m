@@ -1,4 +1,7 @@
 %TEST_ADMMACMIMO Collection of tests for admMACMIMO
+%
+%   Author: Muhammad Umer
+%   Organization: Stanford University
 
 clear;
 clc;

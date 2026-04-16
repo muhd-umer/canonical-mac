@@ -1,6 +1,9 @@
 /**
  * @file solve_tone.cpp
  * @brief Per-tone L-BFGS optimization implementation for minPMAC
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include "solve_tone.hpp"

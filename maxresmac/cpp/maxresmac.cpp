@@ -4,6 +4,9 @@
  *
  * Bisection on lambda with OpenMP-parallelized per-tone L-BFGS.
  * Self-contained: uses own solve_tone and linalg_utils.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include "maxresmac.hpp"

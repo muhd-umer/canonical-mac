@@ -1,6 +1,9 @@
 /**
  * @file maxresmac_mex.cpp
  * @brief MEX gateway for maxRESMAC MIMO solver
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include <complex>

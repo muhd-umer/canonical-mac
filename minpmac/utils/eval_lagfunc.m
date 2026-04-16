@@ -21,6 +21,9 @@ function [f, bun, Rxx_all, state_all] = eval_lagfunc(H, theta, w, bu_min, Lx, id
     %       bun           U x N per-user per-tone rates in nats
     %       Rxx_all       Ltot x Ltot x N covariance matrices
     %       state_all     cell array of per-tone lbfgs states for warm-start
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [Ly, Ltot, N] = size(H);
     U = length(Lx);

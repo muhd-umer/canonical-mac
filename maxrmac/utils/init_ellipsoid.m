@@ -15,6 +15,9 @@ function [A, w_init] = init_ellipsoid(H, Eu, theta, Lxu, idx_start, idx_end)
     %   Outputs:
     %       A           U x U initial ellipsoid shape matrix
     %       w_init      U x 1 initial ellipsoid center (dual variables)
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [Ly, ~, N] = size(H);
     U = length(Lxu);

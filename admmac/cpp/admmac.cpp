@@ -4,6 +4,9 @@
  *
  * Ellipsoid method over theta calling maxRMACMIMO, with vertex sharing
  * for equal-theta clusters.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include "admmac.hpp"

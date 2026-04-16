@@ -6,6 +6,9 @@
  *   mex -R2018a maxrmac_mex.cpp solve_tone.cpp maxrmac.cpp
  *       -I/path/to/eigen3 CXXFLAGS='$CXXFLAGS -fopenmp -O3'
  *       LDFLAGS='$LDFLAGS -fopenmp'
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include <complex>

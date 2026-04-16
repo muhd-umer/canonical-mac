@@ -1,6 +1,9 @@
 /**
  * @file linalg_utils.hpp
  * @brief Linear algebra utilities for maxRESMAC MIMO optimization
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

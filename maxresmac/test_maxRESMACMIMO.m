@@ -1,4 +1,7 @@
 %TEST_MAXRESMACMIMO Collection of tests for maxRESMACMIMO
+%
+%   Author: Muhammad Umer
+%   Organization: Stanford University
 
 clear;
 clc;

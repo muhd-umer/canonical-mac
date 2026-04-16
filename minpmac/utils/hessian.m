@@ -3,6 +3,9 @@ function [g, H] = hessian(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
     %   [g, H] = HESSIAN(theta, Hmat, Rxx, w, Lx, idx_start, idx_end, ind, Ly)
     %   computes the gradient and Hessian of the Lagrangian with respect to
     %   the transmit covariance matrices for the min-power MAC problem.
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     U = length(Lx);
     Ltot = sum(Lx);

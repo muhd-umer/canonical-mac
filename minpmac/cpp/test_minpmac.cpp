@@ -4,6 +4,9 @@
  *
  * Ports test cases from MATLAB test_minPMACMIMO.m and adds performance
  * benchmarks.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include <chrono>

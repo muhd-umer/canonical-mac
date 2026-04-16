@@ -22,6 +22,9 @@ function [f, b, Rxx, E, state_out] = solve_tone(H, theta, w, Lxu, idx_start, idx
     %       Rxx         U-by-1 cell array of covariance matrices
     %       E           U-by-1 per-user energies
     %       state_out   state structure for warm-starting
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [Ly, ~] = size(H);
     U = length(Lxu);

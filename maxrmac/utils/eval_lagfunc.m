@@ -18,6 +18,9 @@ function [f, bun, Eun, Rxx_all, state_all] = eval_lagfunc(H, theta, w, Lxu, idx_
     %       Eun         U x N per-user per-tone energies
     %       Rxx_all     U x N cell array of covariance matrices
     %       state_all   cell array of per-tone states for warm-start
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [~, ~, N] = size(H);
     U = length(Lxu);

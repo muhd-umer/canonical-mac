@@ -4,6 +4,9 @@
  *
  * Provides numerically stable log-determinant, Cholesky factorization,
  * water-filling, and matrix helper functions.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

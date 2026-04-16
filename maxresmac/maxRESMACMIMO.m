@@ -22,6 +22,9 @@ function [Rxxs, Eun, w, bun] = maxRESMACMIMO(H, Lxu, Etotal, theta, cb, use_mex)
     %       Eun     U x N energy distribution matrix.
     %       w       U x 1 Lagrangian multiplier vector w.r.t. energy constraints.
     %       bun     U x N bit distribution matrix for all users.
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     if nargin < 6
         use_mex = true;

@@ -5,6 +5,9 @@
  * Maximizes weighted sum-rate subject to a single total sum-energy
  * constraint using bisection on Lagrange multiplier lambda.
  * Self-contained: does not depend on maxrmac.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

@@ -1,6 +1,9 @@
 /**
  * @file admmac_mex.cpp
  * @brief MEX gateway for admMACMIMO feasibility solver
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include <complex>

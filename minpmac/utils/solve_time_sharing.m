@@ -17,6 +17,9 @@ function [weights, active_idx] = solve_time_sharing(bu_vertices, bu_min, tol)
     %       bu_vertices * weights >= bu_min - tol
     %       sum(weights) == 1
     %       weights >= 0
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     if nargin < 3
         tol = 1e-3;

@@ -38,6 +38,9 @@ function [FEAS_FLAG, bu_a, Rxxs, Eun, theta, w, info] = admMACMIMO(H, Lxu, bu, E
     %                   - if FEAS_FLAG=0: empty cell
     %                   - if FEAS_FLAG=1: 1-row table with {bu_v, bun, order}
     %                   - if FEAS_FLAG=2: v-row table with {bu_v, bun, order, frac, clusterID}
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     if nargin < 6
         use_mex = true;

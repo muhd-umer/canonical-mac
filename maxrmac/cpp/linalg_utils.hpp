@@ -4,6 +4,9 @@
  *
  * Provides numerically stable log-determinant, Cholesky factorization,
  * and matrix helper functions optimized for small matrices.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

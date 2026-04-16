@@ -17,6 +17,9 @@ function [A, g, w] = init_ellipsoid(H, bu, w, cb, Lx, idx_start, idx_end)
     %       A           U x U initial ellipsoid shape matrix
     %       g           U x 1 initial ellipsoid center
     %       w           (pass-through) energy weights
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [Ly, Ltot, N] = size(H);
     U = length(Lx);

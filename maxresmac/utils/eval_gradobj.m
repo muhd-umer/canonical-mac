@@ -19,6 +19,9 @@ function [phi, grad_blocks, R_blocks] = eval_gradobj(B_blocks, Hn, delta, lambda
     %       phi         scalar negative objective (for minimization)
     %       grad_blocks U-by-1 cell array of gradients w.r.t. B_u
     %       R_blocks    U-by-1 cell array of covariance matrices Rxx_u
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     eye_Ly = eye(Ly);
     S = eye_Ly;

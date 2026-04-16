@@ -22,6 +22,9 @@ function [Rxx_opt, E_opt] = solve_tone(Hn, Lxu, idx_start, idx_end, delta, lambd
     %       E_opt       U-by-1 vector of per-user energies
 
     % initialize B factors
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
     B_blocks = cell(U, 1);
 
     for u = 1:U

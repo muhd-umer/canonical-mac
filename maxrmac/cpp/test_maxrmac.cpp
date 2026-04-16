@@ -1,9 +1,8 @@
 /**
  * @file test_maxrmac.cpp
- * @brief Comprehensive test suite for maxRMAC MIMO C++ implementation
- *
- * Ports test cases from MATLAB test_maxRMACMIMO.m and adds performance
- * benchmarks.
+ * 
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include <chrono>

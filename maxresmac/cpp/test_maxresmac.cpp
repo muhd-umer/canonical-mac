@@ -1,3 +1,10 @@
+/**
+ * @file test_maxresmac.cpp
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
+ */
+
 #include <chrono>
 #include <cmath>
 #include <iomanip>

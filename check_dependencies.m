@@ -3,6 +3,9 @@ function check_dependencies()
     %   CHECK_DEPENDENCIES() verifies the presence of QuaDRiGa,
     %   CVX on the MATLAB path, and MOSEK installation. It notifies the user
     %   of missing components along with guide.
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     fprintf('Checking dependencies...\n');
 

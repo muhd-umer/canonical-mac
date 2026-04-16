@@ -6,6 +6,9 @@
  *   mex -R2018a minpmac_mex.cpp solve_tone.cpp minpmac.cpp
  *       -I/path/to/eigen3 -lglpk CXXFLAGS='$CXXFLAGS -fopenmp -O3'
  *       LDFLAGS='$LDFLAGS -fopenmp'
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include <complex>

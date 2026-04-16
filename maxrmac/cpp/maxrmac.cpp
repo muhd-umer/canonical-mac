@@ -4,6 +4,9 @@
  *
  * Uses ellipsoid method for dual optimization with OpenMP-parallelized
  * per-tone L-BFGS optimization.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #include "maxrmac.hpp"

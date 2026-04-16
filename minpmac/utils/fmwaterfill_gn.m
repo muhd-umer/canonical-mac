@@ -15,6 +15,9 @@ function [bn, en] = fmwaterfill_gn(gn, b_bar, gap, cb)
     %       bn      bit allocation per subchannel.
 
     % convert dB gap to linear scale
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
     gap = 10 ^ (gap / 10);
 
     % capture number of tones

@@ -1,3 +1,10 @@
+/**
+ * @file test_admmac.cpp
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
+ */
+
 #include <chrono>
 #include <cmath>
 #include <iomanip>

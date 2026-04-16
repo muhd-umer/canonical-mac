@@ -23,6 +23,9 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
     %       info        structure with detailed solution metrics including:
     %                   frac   time-sharing fractions for active decoding orders (empty if single order).
     %                   bun    per-tone bit allocations for the returned solution.
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     if nargin < 6
         use_mex = true;

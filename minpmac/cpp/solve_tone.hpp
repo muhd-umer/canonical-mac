@@ -4,6 +4,9 @@
  *
  * Solves the per-tone Lagrangian optimization problem using L-BFGS
  * over Cholesky factors of covariance matrices.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

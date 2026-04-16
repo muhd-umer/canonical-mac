@@ -21,6 +21,9 @@ function [f, b, Rxx, state_out] = solve_dual_tone(H, theta, w, Lx, idx_start, id
     %       b         U-by-1 rate vector in nats/channel use (consistent with SISO).
     %       Rxx       Ltot-by-Ltot transmit covariance matrix for this tone.
     %       state_out optional structure retaining lbfgs warm-start data.
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [Ly, ~] = size(H);
     U = length(Lx);

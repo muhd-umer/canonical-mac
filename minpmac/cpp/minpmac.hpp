@@ -4,6 +4,9 @@
  *
  * Implements minimum weighted energy optimization subject to per-user
  * rate constraints using ellipsoid method + L-BFGS.
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

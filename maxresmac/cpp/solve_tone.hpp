@@ -5,6 +5,9 @@
  * Direct C++ port of maxresmac/utils/solve_tone.m and eval_gradobj.m.
  * Solves: max sum_u delta(u)*log|S_u| - lambda*sum_u trace(Rxx_u)
  * where S_u = I + sum_{j=1}^u H_j*Rxx_j*H_j'
+ *
+ * @author Muhammad Umer
+ * @organization Stanford University
  */
 
 #pragma once

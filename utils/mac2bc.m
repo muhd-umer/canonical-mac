@@ -14,6 +14,9 @@ function Rxxb = mac2bc(Rxxm, Hmac)
     %       Rxxb    Ly-by-Ly-by-U array of dual BC covariance matrices. The
     %               output ordering matches the dual BC convention implied by
     %               the reversal used internally.
+    %
+    %   Author: Muhammad Umer
+    %   Organization: Stanford University
 
     [Ly, Lx, U] = size(Hmac);
 
