@@ -23,6 +23,7 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
     %       info        structure with detailed solution metrics including:
     %                   frac   time-sharing fractions for active decoding orders (empty if single order).
     %                   bun    per-tone bit allocations for the returned solution.
+    %                   ...    among other fields for debugging and analysis.
     %
     %   Author: Muhammad Umer
     %   Organization: Stanford University
@@ -85,6 +86,16 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
             info.Rxx = {info.Rxx};
         else
             info.Rxx = {};
+        end
+
+        if ~isempty(info.Rxx)
+            idx_end_mex = cumsum(Lx_vec);
+            idx_start_mex = [1, idx_end_mex(1:end - 1) + 1];
+            info.Eun = compute_per_tone_energies(info.Rxx{1}, U, size(H, 3), ...
+                Lx_vec, idx_start_mex, idx_end_mex);
+            info.Eu_avg = sum(info.Eun, 2).' / size(H, 3);
+        else
+            info.Eun = [];
         end
 
         return;
@@ -258,8 +269,9 @@ function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lx, bu_min, w, cb, use_mex, us
 
     end
 
-    % compute average energies
-    info.Eu_avg = compute_avg_energies(Rxx_opt, U, N, Lx, idx_start, idx_end);
+    % compute per-tone and average energies
+    info.Eun = compute_per_tone_energies(Rxx_opt, U, N, Lx, idx_start, idx_end);
+    info.Eu_avg = sum(info.Eun, 2).' / N;
     info.elapsed_time = toc;
 
     fprintf('minPMACMIMO completed in %.3f seconds, FEAS_FLAG=%d\n', info.elapsed_time, FEAS_FLAG);
@@ -425,6 +437,20 @@ function [weights, bu_vertices, bun_vertices, orderings] = time_sharing(H, ...
     bu_vertices = bu_vertices(:, active_idx);
     bun_vertices = bun_vertices(active_idx);
     orderings = orderings(active_idx);
+end
+
+function Eun = compute_per_tone_energies(Rxx, U, N, Lx, idx_start, idx_end)
+    Eun = zeros(U, N);
+
+    for u = 1:U
+        ant_idx = idx_start(u):idx_end(u);
+
+        for n = 1:N
+            Eun(u, n) = real(trace(Rxx(ant_idx, ant_idx, n)));
+        end
+
+    end
+
 end
 
 function Eu_avg = compute_avg_energies(Rxx, U, N, Lx, idx_start, idx_end)
